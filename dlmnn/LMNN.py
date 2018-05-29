@@ -10,37 +10,51 @@ Created on Fri Feb 16 08:50:54 2018
 from __future__ import print_function
 import tensorflow as tf
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import numpy as np
 import datetime
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.decomposition import PCA
 
-from tf_funcs import tf_makePairwiseFunc
-from helper import get_optimizer, progressBar
-from logger import stat_logger
+from dlmnn.helper.tf_funcs import tf_makePairwiseFunc
+from dlmnn.helper.utility import get_optimizer, progressBar
+from dlmnn.helper.logger import stat_logger
 
 #%% Main Class
 class LMNN(object):
     def __init__(self, tf_transformer, margin=1, session=None, dir_loc=None,
                  optimizer='adam', verbose = 1):
         ''' Class for running the Large Margin Nearest Neighbour algorithm. 
-        Methods:
-            tf_findImposters, tf_LMNN_loss, fit, transform, findTargetNeighbours,
-            transform, KNN_classifier, evaluate, save_weights
+            
         Arguments:
+            
             tf_transformer: a callable function that takes a single i.e:
                 X_trans = tf_transformer(X). It is this function that is optimized
                 during training, and should therefore include some trainable
                 parameters
+            
             margin: margin threshold for the algorithm. Determines the scaling of the
                 feature space
+            
             session: tensorflow session which the computations are runned within. 
                 If None then a new is opened
+            
             dir_loc: directory to store tensorboard files. If None, a folder
                 will be created named lmnn
+            
             optimizer: str or callable, which optimizer to use for the training
-                verbose: 0, 1 or 2, controls the level of output
+            
+            verbose: 0, 1 or 2, controls the level of output
+                
+        Methods:
+            tf_findImposters 
+            tf_LMNN_loss 
+            fit
+            transform
+            findTargetNeighbours
+            transform
+            KNN_classifier
+            evaluate
+            save_weights
         '''
         # Initilize session and tensorboard dirs 
         self.trans_name = tf_transformer.__name__
@@ -57,7 +71,6 @@ class LMNN(object):
         
         # Set margin for algorithm (determine scaling in feature space)
         self.margin = margin
-        self.dim = 1 # dimensionality of data, set when data is given
 
         # Set transformer and create a pairwise distance metric function
         self.transformer = tf_transformer
@@ -70,6 +83,7 @@ class LMNN(object):
                     D(i, imposter) <= D(i, target_neighbour) + 1,
                     y(imposter) == y(target_neibour)
             for a given distance measure
+            
         Arguments:
             X: N x ? matrix or tensor of data
             y: N x 1 vector, with class labels
@@ -77,7 +91,7 @@ class LMNN(object):
             tN: (N*k) x 2 matrix, where the first column in each row is the
                 observation index and the second column is the index of one
                 of the k target neighbours
-        Output
+        Output:
             tup: M x 3, where M is the number of triplets that where found to
                  fullfill the imposter equation. First column in each row is the 
                  observation index, second column is the target neighbour index
@@ -114,7 +128,8 @@ class LMNN(object):
         
     def tf_LMNN_loss(self, X, y, tN, tup, mu, margin=None):
         ''' Calculates the LMNN loss (eq. 13 in paper)
-        Arguments
+        
+        Arguments:
             X: N x ? matrix or tensor of data
             y: N x 1 vector, with class labels
             tN: (N*k) x 2 matrix, with targetmetric,  neighbour index
@@ -127,7 +142,8 @@ class LMNN(object):
                  and the third column is the imposter index
             mu: scalar, weighting coefficient between the push and pull term
             margin: scalar, margin for the algorithm
-        Output
+        
+        Output:
             loss: scalar, the LMNN loss
             D_pull: ? x 1 vector, with pull distance terms
             D_tN: ? x 1 vector, with the first push distance terms
@@ -145,8 +161,8 @@ class LMNN(object):
             D_im = tf.gather_nd(D, tup[:,::2])
             
             # Calculate pull and push loss
-            pull_loss = tf.reduce_sum(1.0/self.dim * D_pull)
-            push_loss = tf.reduce_sum(margin + 1.0/self.dim*D_tn - 1.0/self.dim*D_im)            
+            pull_loss = tf.reduce_sum(D_pull)
+            push_loss = tf.reduce_sum(margin + D_tn - D_im)            
             
             # Total loss
             loss = (1-mu) * pull_loss + mu * push_loss
@@ -154,15 +170,16 @@ class LMNN(object):
         
     def fit(self,  Xtrain, ytrain, k, mu=0.5, maxEpoch=100, learning_rate=1e-4, 
               batch_size=50, val_set=None, run_id = None, snapshot=10):
-        '''
-        Function for training the LMNN algorithm
+        """ Function for training the LMNN algorithm
         
-        '''
+        Arguments:
+
+        """
         # Tensorboard file writers
         run_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M') if run_id \
                  is None else run_id
         loc = self.dir_loc + '/' + run_id
-        os.makedirs(self.dir_loc)
+        if not os.path.exists(self.dir_loc): os.makedirs(self.dir_loc)
         if self.verbose == 2: 
             self.train_writer = tf.summary.FileWriter(loc + '/train')
         validation = False
@@ -307,7 +324,7 @@ class LMNN(object):
         stats.on_train_end() # End training
         
         # Save variables and training stats
-        self.save_weights(loc + '/trained_metric')
+        self.save_weights(run_id + '/trained_metric')
         stats.save(loc + '/training_stats')
         return stats
     
@@ -385,6 +402,7 @@ class LMNN(object):
         ''' KNN classifier using sklearns library. This function runs the
             calculates on the CPU, so it is slow, but it can handle large amount
             of data.
+            
         Arguments:
             Xtest: M x ? metrix or tensor with test data for which we want to
                    predict its classes for
@@ -392,6 +410,7 @@ class LMNN(object):
             ytrain: N x 1 vector with class labels for the training data
             k: scalar, number of neighbours to look at
             batch_size: integer, number of samples to transform in parallel
+        
         Output:
             pred: M x 1 vector with predicted class labels for the test set
         '''
@@ -409,6 +428,7 @@ class LMNN(object):
     
     def evaluate(self, Xtest, Ytest, Xtrain, ytrain, k, batch_size=50):
         ''' Evaluates the current metric
+        
         Arguments:
             Xtest: M x ? metrix or tensor with test data for which we want to
                    predict its classes for
@@ -416,6 +436,7 @@ class LMNN(object):
             ytrain: N x 1 vector with class labels for the training data
             k: scalar, number of neighbours to look at
             batch_size: integer, number of samples to transform in parallel
+        
         Output
             accuracy: scalar, accuracy of the prediction for the current metric
         '''
@@ -430,45 +451,41 @@ class LMNN(object):
             step: integer, appended to the filename to distingues different saved
                 files from each other
         '''
-        saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
-        saver.save(self.session, filename, global_step = step)
-            
+        saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
+        saver.save(self.session, self.dir_loc+'/'+filename, global_step = step)
+    
+    @property
+    def get_weights(self):
+        weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        return self.session.run(weights)
+    
 #%% 
 if __name__ == '__main__':
-    from helper import lmnn_argparser, read_olivetti
+    from dlmnn.helper.argparser import lmnn_argparser
+    from dlmnn.data.get_img_data import get_olivetti
+    from dlmnn.helper.tf_funcs import tf_mahalanobisTransformer
+    from dlmnn.helper.tf_funcs import keras_mahalanobisTransformer
+    
+    # Get input arguments
     args = lmnn_argparser()
     
-    X_train, y_train, X_test, y_test = read_olivetti(permute=True)
+    X_train, y_train, X_test, y_test = get_olivetti()
     X_train = np.reshape(X_train, (280, -1))
     X_test = np.reshape(X_test, (120, -1))
-    dim = 105
-    pca = PCA(n_components=dim)
+
+    pca = PCA(n_components=50)
     X_train = pca.fit_transform(X_train)    
     X_test = pca.transform(X_test)
-    
-    # Define a function that takes a single input and outputs some transformation
-    # of that input. Remember to wrap in a variable_scope and use get_variable.
-    def tf_mahalanobisTransformer(X, scope='mahalanobis_transformer'):
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
-            X = tf.cast(X, tf.float32)
-            L = tf.get_variable("L", initializer=np.eye(dim, dim-50, dtype=np.float32))
-            return tf.matmul(X, L)
-
-    def tf_convTransformer(X, scope='conv_transformer'):
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
-            X = tf.cast(X, tf.float32)
-            W = tf.get_variable("W", initilizer=np.random.normal(size=(3,3,1,10), dtyep=np.float32))
-            return tf.nn.conv2D(X, W, strides=[1,1,1,1], "VALID")
         
-    lmnn.fit(X_train, y_train, k=2, mu=args['mu'], maxEpoch=args['ne'], 
-             batch_size=args['bs'], learning_rate=args['lr'], 
-             val_set=[X_test, y_test], snapshot=args['ss'])
     # Define class
-    lmnn = LMNN(tf_mahalanobisTransformer, margin = args['m'], dir_loc = 'results',
-                optimizer=args['o'], verbose = args['v'])
+    model = LMNN(tf_transformer = keras_mahalanobisTransformer,
+                 margin = args['m'], 
+                 dir_loc = 'results',
+                 optimizer=args['o'], 
+                 verbose = args['v'])
     
     # Fit transformer
-    lmnn.fit(X_train, y_train, k=2, mu=args['mu'], maxEpoch=args['ne'], 
+    model.fit(X_train, y_train, k=2, mu=args['mu'], maxEpoch=args['ne'], 
              batch_size=args['bs'], learning_rate=args['lr'], 
              val_set=[X_test, y_test], snapshot=args['ss'])
     

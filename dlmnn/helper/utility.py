@@ -40,34 +40,6 @@ def progressBar(value, endvalue, name = 'Process', bar_length=20):
     sys.stdout.flush()
     
 #%%
-def plot_normal2D(mu, sigma):
-    from scipy.linalg import eig
-    eigVal, eigVec = eig(sigma)
-    eigVal = np.maximum(0, np.real(np.diag(eigVal)))
-    t = np.linspace(0, 2*np.pi, 100)
-    xy = np.array([np.cos(t), np.sin(t)])
-    Txy = eigVec.dot(np.sqrt(eigVal)).dot(xy).T + mu
-    plt.plot(Txy[:,0], Txy[:,1], 'b-')
-
-#%%
-def rand_posdef_mat(d):
-    ''' Generate random positive semi-definite matrix of size d x d '''
-    mat = np.random.normal(size=(d,d))
-    mat = np.dot(mat, mat)
-    return mat
-
-#%%
-def random_not_in_sampler(size, N_range, array):
-    samples = [ ]
-    count = 0
-    while count < size:
-        i = np.random.randint(N_range)
-        if i not in array and i not in samples:
-            samples.append(i)
-            count += 1
-    return np.array(samples)
-
-#%%
 def get_optimizer(name):
     ''' Returns a tensorflow optimizer based on name '''
     optimizer = {'adam':     tf.train.AdamOptimizer,
