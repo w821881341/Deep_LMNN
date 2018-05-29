@@ -459,6 +459,7 @@ if __name__ == '__main__':
             X = tf.cast(X, tf.float32)
             W = tf.get_variable("W", initilizer=np.random.normal(size=(3,3,1,10), dtyep=np.float32))
             return tf.nn.conv2D(X, W, strides=[1,1,1,1], "VALID")
+        
     lmnn.fit(X_train, y_train, k=2, mu=args['mu'], maxEpoch=args['ne'], 
              batch_size=args['bs'], learning_rate=args['lr'], 
              val_set=[X_test, y_test], snapshot=args['ss'])

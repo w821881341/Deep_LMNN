@@ -1,6 +1,3 @@
 .spyproject
 __pycache__
-dlmnn/MNIST
-dlmnn/OLIVETTI
-*.npz
-*.pkz
+dlmnn/data/data_files

@@ -8,37 +8,6 @@ Created on Wed Jan 10 10:40:30 2018
 
 #%%
 import tensorflow as tf
-import numpy as np
-
-#%%
-def get_transformer_struct(transformer, params):
-    if transformer == 'mahalanobis':
-        return {'name': 'mahalanobis',
-                'transformer': tf_mahalanobisTransformer,
-                'metric_func': tf_pairwiseMahalanobisDistance2,
-                'initial_metric': np.eye(params[0]),
-                'params': params}
-    elif transformer == 'conv':
-        return {'name': 'conv',
-                'transformer': tf_convTransformer,
-                'metric_func': tf_pairwiseConvDistance2,
-                'initial_metric': np.random.normal(size=params),            
-                'params': params}
-    elif transformer == 'nonlin_conv':
-        return {'name': 'nonlin_conv',
-                'transformer': tf_nonlin_convTransformer,
-                'metric_func': tf_nonlin_pairwiseConvDistance2,
-                'initial_metric': np.random.normal(size=params),
-                'params': params}
-    elif callable(transformer):
-        return {'name': transformer.__name__,
-                'transformer': transformer,
-                'metric_func': tf_makePairwiseFunc(transformer),
-                'initial_metric': [np.random.normal(size=params[i]) for i in range(len(params))],
-                'params': params}
-    else:
-        raise ValueError('''Metric type needs to be one of the following:
-                            mahalanobis, conv ''')
 
 #%%
 def tf_makePairwiseFunc(trans_func):

@@ -11,6 +11,17 @@ import tensorflow as tf
 import os, sys
 
 #%%
+def get_dir(file):
+    """ Get the folder of specified file """
+    return os.path.dirname(os.path.realpath(file))
+
+#%%
+def create_dir(direc):
+    """ Create a dir if it does not already exists """
+    if not os.path.exists(direc):
+        os.mkdir(direc)
+
+#%%
 def colorise(string, color='green'):
     if color=='green': col='0;32;40m'
     elif color=='blue': col='0;34;40m'
@@ -57,20 +68,17 @@ def random_not_in_sampler(size, N_range, array):
     return np.array(samples)
 
 #%%
-def get_dir(file):
-    return os.path.dirname(os.path.realpath(file))
-
-#%%
 def get_optimizer(name):
     ''' Returns a tensorflow optimizer based on name '''
+    optimizer = {'adam':     tf.train.AdamOptimizer,
+                 'sgd':      tf.train.GradientDescentOptimizer,
+                 'momentum': tf.train.MomentumOptimizer}
     try:
-        optimizer = {'adam':     tf.train.AdamOptimizer,
-                     'sgd':      tf.train.GradientDescentOptimizer,
-                     'momentum': tf.train.MomentumOptimizer
-                     }[name]
-        return optimizer
+        opt = optimizer[name]
+        return opt
     except KeyError:
-        raise Exception(name + ' is a invalid option to input optimizer')
+        raise Exception(name + ' is a invalid option to input optimizer, please'
+                        + ' choose between: ' + ', '.join(optimizer.keys()))
 
 #%%
 def adjust_learning_rate(alpha, loss_new, loss_old):
