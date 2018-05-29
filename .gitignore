@@ -1,3 +1,4 @@
 .spyproject
 __pycache__
 dlmnn/data/data_files
+dlmnn/results

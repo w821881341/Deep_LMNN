@@ -40,3 +40,13 @@ def random_not_in_sampler(s, N_range, array):
             samples.append(i)
             count += 1
     return np.array(samples)
+
+#%%
+def weight_func(distances):
+    """ Simple weight function, that accounts for over estimatation of performance
+        when a KNN classifier is used to evaluate the same set it was trained on """
+    N, d = distances.shape
+    if distances[0,0] != 0:
+        return 1.0/d*np.ones((N,d))
+    else:
+        return np.concatenate([np.zeros((N,1)), 1.0/(N-1)*np.ones((N,d-1))], axis=1)

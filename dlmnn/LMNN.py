@@ -17,7 +17,9 @@ from sklearn.decomposition import PCA
 
 from dlmnn.helper.tf_funcs import tf_makePairwiseFunc
 from dlmnn.helper.utility import get_optimizer, progressBar
+from dlmnn.helper.math import weight_func
 from dlmnn.helper.logger import stat_logger
+
 
 #%% Main Class
 class LMNN(object):
@@ -41,7 +43,7 @@ class LMNN(object):
             dir_loc: directory to store tensorboard files. If None, a folder
                 will be created named lmnn
             
-            optimizer: str or callable, which optimizer to use for the training
+            optimizer: str, which optimizer to use for the training
             
             verbose: 0, 1 or 2, controls the level of output
                 
@@ -63,19 +65,15 @@ class LMNN(object):
                         else self.trans_name
         self.train_writer = None
         self.val_writer = None
-        if type(optimizer) == str: 
-            self.optimizer = get_optimizer(optimizer)
-        elif callable(optimizer):
-            self.optimizer = optimizer
-        self.verbose = verbose
         
-        # Set margin for algorithm (determine scaling in feature space)
+        # Set variables for later training
+        self.optimizer = get_optimizer(optimizer)
+        self.verbose = verbose
         self.margin = margin
 
         # Set transformer and create a pairwise distance metric function
         self.transformer = tf_transformer
         self.metric_func = tf_makePairwiseFunc(tf_transformer)
-
     
     def tf_findImposters(self, X, y, tN, margin=None):
         ''' For a set of observations X and that sets target neighbours in tN, 
@@ -173,8 +171,18 @@ class LMNN(object):
         """ Function for training the LMNN algorithm
         
         Arguments:
-
+            Xtrain:  
+            ytrain:                
+            k:            
+            mu:            
+            maxEpoch:            
+            learning_rate:            
+            batch_size:            
+            val_set:            
+            run_id:            
+            snapshot:
         """
+        
         # Tensorboard file writers
         run_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M') if run_id \
                  is None else run_id
@@ -214,7 +222,7 @@ class LMNN(object):
         # Imposters
         tup = self.tf_findImposters(Xp, yp, tNp)
         
-        # Loss func
+        # Loss func and individual distance terms
         LMNN_loss, D_1, D_2, D_3 = self.tf_LMNN_loss(Xp, yp, tNp, tup, mu)
         
         # Optimizer
@@ -251,7 +259,7 @@ class LMNN(object):
             for b in range(n_batch_train):
                 stats.on_batch_begin() # Start batch
                 
-                # Sample target neighbours
+                # Sample target neighbours and extract data from these
                 tN_batch = tN[k*batch_size*b:k*batch_size*(b+1)]
                 idx, inv_idx = np.unique(tN_batch, return_inverse=True)
                 inv_idx = np.reshape(inv_idx, (-1, 2))
@@ -420,10 +428,18 @@ class LMNN(object):
         Xtrain_t = self.transform(Xtrain, batch_size=batch_size)
         Xtest_t = np.reshape(Xtest_t, (Ntest, -1))
         Xtrain_t = np.reshape(Xtrain_t, (Ntrain, -1))
-    
-        classifier = KNeighborsClassifier(n_neighbors = k, n_jobs=-1)
-        classifier.fit(Xtrain_t, ytrain)
-        pred = classifier.predict(Xtest_t)
+        
+        same = np.array_equal(X_test, X_train)
+        if same: # if train and test is same, account for over estimation of
+                 # performance by one more neighbour and zero weight to the first
+            classifier = KNeighborsClassifier(n_neighbors = k+1, weights=weight_func, 
+                                              n_jobs=-1)
+            classifier.fit(Xtrain_t, ytrain)
+            pred = classifier.predict(Xtest_t)
+        else:
+            classifier = KNeighborsClassifier(n_neighbors = k, n_jobs=-1)
+            classifier.fit(Xtrain_t, ytrain)
+            pred = classifier.predict(Xtest_t)
         return pred
     
     def evaluate(self, Xtest, Ytest, Xtrain, ytrain, k, batch_size=50):
