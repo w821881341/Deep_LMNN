@@ -1,128 +1,77 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Nov 30 15:06:31 2017
+Created on Fri Feb 16 08:50:54 2018
 
 @author: nsde
 """
-#%%
+
+#%% Packages to use
 from __future__ import print_function
 import tensorflow as tf
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import numpy as np
-import matplotlib.pyplot as plt
 import datetime
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.decomposition import PCA
-from scipy.spatial.distance import cdist
 
-from tf_funcs import get_transformer_struct
-from helper import get_optimizer, lmnn_argparser, progressBar
+from tf_funcs import tf_makePairwiseFunc
+from helper import get_optimizer, progressBar
 from logger import stat_logger
 
-plt.ion()
-
-#%%
+#%% Main Class
 class LMNN(object):
-    def __init__(self,  metric_struct,
-                        margin = 1, 
-                        session=None, 
-                        dir_loc=None, 
-                        optimizer='adam',
-                        verbose = 1):
-        """ LMNN class used for training the LMNN algorithm
-        Parameters
-        -----------
-        metric_struc: ???
-        margin: scalar, optional (default = 1)
-            margin threshold for the algorithm. Determines the scaling of the
-            feature space
-        session: tf.Session, optional (default = None)
-            tensorflow session which the computations are runned within. If None
-            then a new is opened
-        dir_loc: str, optional (default = None)
-            directory to store tensorboard files for plotting. If None, a folder
-            will be created named lmnn_'metric_type'
-        optimizer: str, optional (default = 'adam')
-            choose which optimizer to use. Choose between 'sgd', 'adam' or 'momentum'
-        verbose: scalar, optional (default = 1)
-            choose the level of output. If verbose=0, nothing will be printed. 
-            If verbose=1, training progress will be printed to the screen. If
-            verbose=2, also do some plotting
-        """
+    def __init__(self, tf_transformer, margin=1, session=None, dir_loc=None,
+                 optimizer='adam', verbose = 1):
+        ''' Class for running the Large Margin Nearest Neighbour algorithm. 
+        Methods:
+            tf_findImposters, tf_LMNN_loss, fit, transform, findTargetNeighbours,
+            transform, KNN_classifier, evaluate, save_weights
+        Arguments:
+            tf_transformer: a callable function that takes a single i.e:
+                X_trans = tf_transformer(X). It is this function that is optimized
+                during training, and should therefore include some trainable
+                parameters
+            margin: margin threshold for the algorithm. Determines the scaling of the
+                feature space
+            session: tensorflow session which the computations are runned within. 
+                If None then a new is opened
+            dir_loc: directory to store tensorboard files. If None, a folder
+                will be created named lmnn
+            optimizer: str or callable, which optimizer to use for the training
+                verbose: 0, 1 or 2, controls the level of output
+        '''
         # Initilize session and tensorboard dirs 
+        self.trans_name = tf_transformer.__name__
         self.session = tf.Session() if session is None else session
-        self.dir_loc = (dir_loc + '/lmnn_' + str(metric_struct['name'])) if dir_loc \
-                        is not None else ('lmnn_' + str(metric_struct['name']))
+        self.dir_loc = (dir_loc+'/'+self.trans_name) if dir_loc is not None \
+                        else self.trans_name
         self.train_writer = None
         self.val_writer = None
-        self.optimizer = get_optimizer(optimizer)
+        if type(optimizer) == str: 
+            self.optimizer = get_optimizer(optimizer)
+        elif callable(optimizer):
+            self.optimizer = optimizer
         self.verbose = verbose
         
         # Set margin for algorithm (determine scaling in feature space)
         self.margin = margin
-        self.dim = 1 # dimensionality of data, set by the train func
-        
-        # Extract relevant function from the metric struct
-        self.metric_type = metric_struct['name']
-        self.transformer = metric_struct['transformer']
-        self.metric_func = metric_struct['metric_func']
-        self.metric = metric_struct['initial_metric']
-        self.metric_parameters = metric_struct['params']
+        self.dim = 1 # dimensionality of data, set when data is given
 
-    #%%
-    def tf_findTargetNeighbours(self, X, y, k):
-        '''
-        For a set of observations in X, for each observation find the k closest 
-        points by euclidian distance that have the same label as the observation.
-        These are called the target neighbours.
-        Input
-            X: N x d matrix, each row being an observation
-            y: N x 1 vector, with class labels
-            k: parameter, number of target neighbours to find
-        Output
-            tN: (N*k) x 2 matrix, where the first column in each row is the
-                observation index and the second column is the index of one
-                of the k target neighbours
-        '''
-        with tf.name_scope('findTargetNeighbours'):
-            # Get shapes
-            N = tf.shape(X)[0]
-            
-            # Calculate distance
-            D = self.metric_func(X, X, self.metric)
-            
-            # Find closest points
-            _, idx = tf.nn.top_k(tf.reduce_max(D)-D, k=N)
-            y_idx = tf.gather(y, idx)
-            
-            # Find points with same class label
-            cond = tf.cast(tf.equal(tf.expand_dims(y_idx[:,0], 1), y_idx[:,1:]), tf.int32)
-            val_same, idx_same = tf.nn.top_k(cond, k=k)
-            
-            # Get the index of those points
-            init_idx = tf.reshape(tf.transpose(tf.ones((k, N), dtype=tf.int32)*tf.range(N)), (-1,1))
-            map_idx = tf.concat([init_idx, tf.reshape(idx_same, (-1,1))], axis=1)
-            final_idx = tf.expand_dims(tf.gather_nd(idx[:,1:], map_idx), axis=1)
-            final_idx = tf.concat([init_idx, final_idx], axis=1)
-            
-            # Filter out some of the observations if k is too high for some of the
-            # classes
-            final_idx = tf.boolean_mask(final_idx, tf.equal(
-                    tf.gather(y, final_idx[:,0]), tf.gather(y, final_idx[:,1])))
-            
-            return final_idx
-        
-    #%%  
-    def tf_findImposters(self, X, y, metric, tN, margin = None):
-        '''
-        For a set of observations X and that sets target neighbours in tN, find
-        all points that violate the following two equations
-            D_L(i, imposter) <= D_L(i, target_neighbour) + 1,
-            y(imposter) == y(target_neibour)
-        for a given mahalanobis distance M = L^T*L
-        Input
-            X: N x d matrix, each row being an observation
+        # Set transformer and create a pairwise distance metric function
+        self.transformer = tf_transformer
+        self.metric_func = tf_makePairwiseFunc(tf_transformer)
+
+    
+    def tf_findImposters(self, X, y, tN, margin=None):
+        ''' For a set of observations X and that sets target neighbours in tN, 
+            find all points that violate the following two equations
+                    D(i, imposter) <= D(i, target_neighbour) + 1,
+                    y(imposter) == y(target_neibour)
+            for a given distance measure
+        Arguments:
+            X: N x ? matrix or tensor of data
             y: N x 1 vector, with class labels
             L: d x d matrix, mahalanobis parametrization where M = L^T*L
             tN: (N*k) x 2 matrix, where the first column in each row is the
@@ -140,7 +89,7 @@ class LMNN(object):
             n_tN = tf.shape(tN)[0]
             
             # Calculate distance
-            D = self.metric_func(X, X, metric) # d x d
+            D = self.metric_func(X, X) # d x d
             
             # Create all combination of [points, targetneighbours, imposters]
             possible_imp_array =  tf.expand_dims(tf.reshape(
@@ -163,32 +112,32 @@ class LMNN(object):
             tup = tf.cast(tup, tf.int32) # tf.gather do not support first input.dtype=int32 on GPU
             return tup
         
-    #%%
-    def tf_LMNN_loss(self, X, y, metric, tN, tup, mu, margin=None):
-        '''
-        Calculated an adjusted version of the LMNN loss (eq. 13 in paper). In
-        this version we sum over all triplets in both the pull and push term,
-        such that no imposters implies that we do not pull or push:
-            sum_i(sum_j(pull(j->i)) + sum_j(sum_k(push(k != j->i))))
-        Input
-            X: N x d matrix, each row being a_batchn observation
+    def tf_LMNN_loss(self, X, y, tN, tup, mu, margin=None):
+        ''' Calculates the LMNN loss (eq. 13 in paper)
+        Arguments
+            X: N x ? matrix or tensor of data
             y: N x 1 vector, with class labels
-            metric: d x d matrix, mahalanobis parametrization where M = L^T*L
-            tN: 
-            tup: M x 3, where M is the number of triplets that where found to
-                 fullfill the imposter equation. First column in each row is the 
+            tN: (N*k) x 2 matrix, with targetmetric,  neighbour index
+            tup: ? x 3, where M is the number of triplets that where found to
+                 fullfill the imposter equXtest: M x ? metrix or tensor with test data for which we want to
+                   predict its classes for
+            Xtrain: N x ? matrix or tensor with training data
+            ytrain: N x 1 vector with class labels foration. First column in each row is the 
                  observation index, second column is the target neighbour index
                  and the third column is the imposter index
             mu: scalar, weighting coefficient between the push and pull term
             margin: scalar, margin for the algorithm
         Output
             loss: scalar, the LMNN loss
+            D_pull: ? x 1 vector, with pull distance terms
+            D_tN: ? x 1 vector, with the first push distance terms
+            D_im: ? x 1 vector, with the second push distance terms
         '''
         with tf.name_scope('LMNN_loss'):
             margin = self.margin if margin is None else margin
             
             # Calculate distance
-            D = self.metric_func(X, X, metric) # N x N
+            D = self.metric_func(X, X) # N x N
             
             # Gather relevant distances
             D_pull = tf.gather_nd(D, tN)
@@ -202,77 +151,27 @@ class LMNN(object):
             # Total loss
             loss = (1-mu) * pull_loss + mu * push_loss
             return loss, D_pull, D_tn, D_im
-    
-    #%%
-    def tf_KNN_classifier(self, Xtest, Xtrain, ytrain, k, metric=None):
-        '''
-        Standard KNN classifier based on the distance measure parametrized by 
-        some metric        
-        Input
-            Xtest: M x d matrix, with test observations            
-            Xtrain: N x d matrix, with training observations            
-            ytrian: N x 1 vector, with training class labels            
-            L: d x d matrix, mahalanobis parametrization where M = L^T*L
-            k: scalar, number of neigbours to consider
-        Output
-            ytest: M x 1 vector, with predicted class labels for the test set
-        '''
-        with tf.name_scope('KNN_classifier'):
-            metric = self.metric if metric is None else metric
-            # Calculate distance
-            D = self.metric_func(Xtest, Xtrain, metric)
         
-            # Find k nearest neigbours
-            _, idx = tf.nn.top_k(tf.reduce_max(D) - D, k)
-            
-            # Get their labels
-            yidx = tf.gather(ytrain, idx)
-            
-            # Find the most common label
-            ytest = tf.map_fn(tf_mode, yidx)
-            return ytest
-
-    #%%
-    def train(self, Xtrain, ytrain, k, mu=0.5, maxEpoch=100, metricInit = None, 
-                 learning_rate=1e-4, batch_size=50, val_set=None, run_id = None,
-                 tN=None, snapshot=10):
+    def fit(self,  Xtrain, ytrain, k, mu=0.5, maxEpoch=100, learning_rate=1e-4, 
+              batch_size=50, val_set=None, run_id = None, snapshot=10):
         '''
         Function for training the LMNN algorithm
-        Input
-            Xtrain: N x ?, Input training data, can be a 4D tensor of images
-                    or a matrix with data in standard format
-            ytrain: N x 1 vector, with training labels
-            k: scalar, number of target neighbours
-            mu: scalar, weighting coefficient between the push and pull term
-            maxEpoch: scalar, maximum number of epochs to run the algorithm
-            metricInit: tensor or matrix, initial metric
-            learning_rate: scalar, initial learning rate for the optimizer
-            batch_size: integer, number of samples to process in each iteration
-            val_set: 2-element list, a list [Xval, yval] where Xval should have
-                     same format as Xtrain and yval should have equal number of
-                     labels as samples in Xval
-            run_id: string, custom name to use for the tensorboard loggin
-            tN: matrix, target neighbours for the learning algorithm. If none,
-                these will be calculated by the program
-            snapshot: integer, determines how often to calculate accuracy on
-                      train set and evaluate on validation set, since this is
-                      very costly to do
-        Output
-            stats: a instance of the stat_logger class which contains all
-                   information gather during training
+        
         '''
         # Tensorboard file writers
         run_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M') if run_id \
                  is None else run_id
         loc = self.dir_loc + '/' + run_id
-        self.train_writer = tf.summary.FileWriter(loc + '/train')
+        os.makedirs(self.dir_loc)
+        if self.verbose == 2: 
+            self.train_writer = tf.summary.FileWriter(loc + '/train')
+        validation = False
         if val_set:
             validation = True
-            self.val_writer = tf.summary.FileWriter(loc + '/val')
             Xval, yval = val_set
-        else:
-            validation = False
-            
+            if self.verbose == 2:
+                self.val_writer = tf.summary.FileWriter(loc + '/val')
+        
         # Training parameters
         N_train = Xtrain.shape[0]
         n_batch_train = int(np.ceil(N_train / batch_size))
@@ -285,16 +184,9 @@ class LMNN(object):
         print(50*'-')
         
         # Target neighbours
-        if tN is None:
-            tN = self.findTargetNeighbours(Xtrain, ytrain, k, name='Training')
+        tN = self.findTargetNeighbours(Xtrain, ytrain, k, name='Training')
         if validation:
             tN_val = self.findTargetNeighbours(Xval, yval, k, name='Validation')
-        
-        # Metric to train
-        self.dim = np.product(Xtrain.shape[1:])
-        metricInit = self.metric if metricInit is None else metricInit
-        metricInit = 1 + metricInit + np.random.normal(scale=0.1, size=metricInit.shape) # add some noise
-        metric = tf.Variable(metricInit, dtype=tf.float32, name='Metric')
         
         # Placeholders for data
         global_step = tf.Variable(0, trainable=False)
@@ -303,22 +195,19 @@ class LMNN(object):
         tNp = tf.placeholder(tf.int32, shape=(None, 2), name='In_targetNeighbours')
         
         # Imposters
-        tup = self.tf_findImposters(Xp, yp, metric, tNp)
+        tup = self.tf_findImposters(Xp, yp, tNp)
         
         # Loss func
-        LMNN_loss, D_1, D_2, D_3 = self.tf_LMNN_loss(Xp, yp, metric, tNp, tup, mu)
+        LMNN_loss, D_1, D_2, D_3 = self.tf_LMNN_loss(Xp, yp, tNp, tup, mu)
         
         # Optimizer
         optimizer = self.optimizer(learning_rate = learning_rate)
         trainer = optimizer.minimize(LMNN_loss, global_step=global_step)
         
         # Summaries
-        metricNorm = tf.norm(metric)
         n_tup = tf.shape(tup)[0]
         true_imp = tf.cast(tf.less(D_3, D_2), tf.float32)
         tf.summary.scalar('Loss', LMNN_loss) 
-        tf.summary.scalar('Metric_Norm', metricNorm)
-        tf.summary.histogram('Metric', metric)
         tf.summary.scalar('Num_imp', n_tup)
         tf.summary.scalar('Loss_pull', tf.reduce_sum(D_1))
         tf.summary.scalar('Loss_push', tf.reduce_sum(self.margin + D_2 - D_3))
@@ -330,7 +219,7 @@ class LMNN(object):
         # Initilize
         init = tf.global_variables_initializer()
         self.session.run(init)
-        self.train_writer.add_graph(self.session.graph)
+        if self.verbose==2: self.train_writer.add_graph(self.session.graph)
         
         # Training
         stats = stat_logger(maxEpoch, n_batch_train)
@@ -338,42 +227,44 @@ class LMNN(object):
         for e in range(maxEpoch):
             stats.on_epoch_begin() # Start epoch
             
+            # Permute target neighbours
             tN = np.random.permutation(tN)
+            
             # Do backpropagation
             for b in range(n_batch_train):
                 stats.on_batch_begin() # Start batch
-
+                
+                # Sample target neighbours
                 tN_batch = tN[k*batch_size*b:k*batch_size*(b+1)]
                 idx, inv_idx = np.unique(tN_batch, return_inverse=True)
                 inv_idx = np.reshape(inv_idx, (-1, 2))
                 X_batch = Xtrain[idx]
                 y_batch = ytrain[idx]
                 feed_data = {Xp: X_batch, yp: y_batch, tNp: inv_idx}
-            
+                
                 # Evaluate graph
-                _, loss_out, norm_out, ntup_out, summ = self.session.run(
-                    [trainer, LMNN_loss, metricNorm, n_tup, merged], 
+                _, loss_out, ntup_out, summ = self.session.run(
+                    [trainer, LMNN_loss, n_tup, merged], 
                     feed_dict=feed_data)
                 
                 # Save stats
                 stats.add_stat('loss', loss_out)
-                stats.add_stat('norm', norm_out)
                 stats.add_stat('#imp', ntup_out)                   
                 
                 # Save to tensorboard
-                self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
+                if self.verbose==2: 
+                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
                 stats.on_batch_end() # End batch
-            
+                
             # Evaluate accuracy every 'snapshot' epoch (expensive to do) and
             # on the last epoch
             if e % snapshot == 0 or e == maxEpoch-1:
-                y_pred = self.KNN_classifier(Xtrain, Xtrain, ytrain, k=k, 
-                                             metric=metric, batch_size=batch_size)
-                acc = np.mean(y_pred == y_train)
+                acc = self.evaluate(Xtrain, ytrain, Xtrain, ytrain, k=k, batch_size=batch_size)
                 stats.add_stat('acc', acc)
-                summ = tf.Summary(value=[tf.Summary.Value(tag='Accuracy', simple_value=acc)])
-                self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
-                                
+                if self.verbose==2:
+                    summ = tf.Summary(value=[tf.Summary.Value(tag='Accuracy', simple_value=acc)])
+                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
+            
             # Do validation if val_set is given and we are in the snapshot epoch
             # or at the last epoch
             if validation and (e % snapshot == 0 or e == maxEpoch-1):
@@ -386,84 +277,80 @@ class LMNN(object):
                     X_batch = Xval[idx]
                     y_batch = yval[idx]
                     feed_data = {Xp: X_batch, yp: y_batch, tNp: inv_idx}
-                    loss_out, ntup_out = self.session.run([LMNN_loss, n_tup], feed_dict=feed_data)
+                    loss_out, ntup_out = self.session.run([LMNN_loss, n_tup], 
+                                                          feed_dict=feed_data)
                     stats.add_stat('loss_val', loss_out)
                     stats.add_stat('#imp_val', ntup_out)
                 
                 # Compute accuracy
-                y_pred = self.KNN_classifier(Xval, Xtrain, ytrain, k=k, 
-                                             metric=metric, batch_size=batch_size)
-                acc = np.mean(y_pred == yval)
+                acc = self.evaluate(Xval, yval, Xtrain, ytrain, k=k, batch_size=batch_size)
                 stats.add_stat('acc_val', acc)
                 
-                # Write stats to summary protocol buffer
-                summ = tf.Summary(value=[
-                    tf.Summary.Value(tag='Loss', simple_value=np.mean(stats.get_stat('loss_val'))),
-                    tf.Summary.Value(tag='NumberOfImposters', simple_value=np.mean(stats.get_stat('#imp_val'))),
-                    tf.Summary.Value(tag='Accuracy', simple_value=np.mean(stats.get_stat('acc_val')))])
+                if self.verbose==2:
+                    # Write stats to summary protocol buffer
+                    summ = tf.Summary(value=[
+                        tf.Summary.Value(tag='Loss', simple_value=np.mean(stats.get_stat('loss_val'))),
+                        tf.Summary.Value(tag='NumberOfImposters', simple_value=np.mean(stats.get_stat('#imp_val'))),
+                        tf.Summary.Value(tag='Accuracy', simple_value=np.mean(stats.get_stat('acc_val')))])
              
-                # Save to tensorboard
-                self.val_writer.add_summary(summ, global_step=n_batch_train*e)
-    
+                    # Save to tensorboard
+                    self.val_writer.add_summary(summ, global_step=n_batch_train*e)
+            
             stats.on_epoch_end() # End epoch
             
-            # Check if we should terminate
+             # Check if we should terminate
             if stats.terminate: break
             
             # Write stats to console
             if self.verbose: stats.write_stats()
-        
+            
         stats.on_train_end() # End training
         
-        # Save the metric and output the training stats
-        trained_metric = self.session.run(metric)
-        self.metric = trained_metric
-        self.save_metric(run_id+'/trained_metric.npy', metric=trained_metric)
+        # Save variables and training stats
+        self.save_weights(loc + '/trained_metric')
         stats.save(loc + '/training_stats')
         return stats
     
-    #%%
-    def transform(self, X, metric=None, batch_size = 100):
-        ''' Transform the data in X according to a given metric
-        Input:
+    def transform(self, X, batch_size=64):
+        ''' Transform the data in X
+        Arguments:
             X: N x ?, matrix or tensor of data
-            metric: matrix or tensor with the metric to use
             batch_size: scalar, number of samples to transform in parallel
         Output:
             X_trans: N x ?, matrix or tensor with the transformed data
         '''
-        # Check metric and metric parameters
-        metric = self.metric if metric is None else metric
-        metric_parameters = [self.metric_parameters] if type(self.metric_parameters) \
-                            is not list else self.metric_parameters
-        # Create structure to hold new observations
+        # Parameters for transformer
         N = X.shape[0]
         n_batch = int(np.ceil(N / batch_size))
-        X_trans = np.zeros((*X.shape[:-1], metric_parameters[-1]), X.dtype)
+        
+        # Find the shape of the transformed data by transforming a single observation
+        X_new = self.session.run(self.transformer(X[:1]))
+        X_trans = np.zeros((N, *X_new.shape[1:]))
         
         # Transform data in batches
         for b in range(n_batch):
             X_batch = X[batch_size*b:batch_size*(b+1)]
-            X_batch_trans = self.transformer(X_batch, metric)
+            X_batch_trans = self.transformer(X_batch)
             X_trans[batch_size*b:batch_size*(b+1)] = self.session.run(X_batch_trans)
         return X_trans
+    
    
-    #%%
-    def findTargetNeighbours(self, X, y, k, do_pca=True, permute=False, name=''):
-        ''' Numpy/sklearn implementation to find target neighbours for large datasets.
-        This cannot use the GPU, but instead uses an advance ball-tree method.
-        Input:
+    def findTargetNeighbours(self, X, y, k, do_pca=True, name=''):
+        ''' Numpy/sklearn implementation to find target neighbours for large 
+            datasets. This function cannot use the GPU and thus runs on the CPU,
+            but instead uses an advance ball-tree method.
+        Arguments:
             X: N x ?, metrix or tensor with data
             y: N x 1, vector with labels
             k: scalar, number of target neighbours to find
-            reshape: bool, if the input should be reshaped into a (N, -1) matrix
             do_pca: bool, if true then the data will first be projected onto
-                    a pca-space which captures 95% of the variation in data
-            permute: bool, if true then the target neighbour matrix is permuted
-                     before it is returned
+                a pca-space which captures 95% of the variation in data
             name: str, name of the dataset
+        Output:
+            tN: (N*k) x 2 matrix, with target neighbour index. 
         '''
         print(50*'-')
+        # Reshape data into 2D
         N = X.shape[0]
         X = np.reshape(X, (N, -1))
         if do_pca:
@@ -474,11 +361,14 @@ class LMNN(object):
         counter = 1
         tN_count = 0
         tN = np.zeros((N*k, 2), np.int32)
+        # Iterate over each class
         for c in val:
-            progressBar(counter, len(val), name='Finding target neighbours for ' + name)
+            progressBar(counter, len(val), 
+                        name='Finding target neighbours for '+name)
             idx = np.where(y==c)[0]
             n_c = len(idx)
             x = X[idx]
+            # Find the nearest neighbours
             nbrs = NearestNeighbors(n_neighbors=k+1, algorithm='ball_tree')
             nbrs.fit(x)
             _, indices = nbrs.kneighbors(x)
@@ -487,32 +377,28 @@ class LMNN(object):
                 tN[tN_count:tN_count+n_c,1] = idx[indices[:,kk]]
                 tN_count += n_c
             counter += 1
-        print(' ')
-        if permute:
-            print('Permuting target neighbours')
-            tN = np.random.permutation(tN)
+        print('')
         print(50*'-')
         return tN
     
-    #%%
-    def KNN_classifier(self, Xtest, Xtrain, ytrain, k, metric, batch_size=50):
-        '''
-        KNN classifier using sklearns library. This scales well for alot of data
-        Input:
+    def KNN_classifier(self, Xtest, Xtrain, ytrain, k, batch_size=50):
+        ''' KNN classifier using sklearns library. This function runs the
+            calculates on the CPU, so it is slow, but it can handle large amount
+            of data.
+        Arguments:
             Xtest: M x ? metrix or tensor with test data for which we want to
                    predict its classes for
             Xtrain: N x ? matrix or tensor with training data
             ytrain: N x 1 vector with class labels for the training data
             k: scalar, number of neighbours to look at
-            metric: determines the space we measure distance in
             batch_size: integer, number of samples to transform in parallel
         Output:
             pred: M x 1 vector with predicted class labels for the test set
         '''
         Ntest = Xtest.shape[0]
         Ntrain = Xtrain.shape[0]
-        Xtest_t = self.transform(Xtest, metric, batch_size=batch_size)
-        Xtrain_t = self.transform(Xtrain, metric, batch_size=batch_size)
+        Xtest_t = self.transform(Xtest, batch_size=batch_size)
+        Xtrain_t = self.transform(Xtrain, batch_size=batch_size)
         Xtest_t = np.reshape(Xtest_t, (Ntest, -1))
         Xtrain_t = np.reshape(Xtrain_t, (Ntrain, -1))
     
@@ -521,141 +407,67 @@ class LMNN(object):
         pred = classifier.predict(Xtest_t)
         return pred
     
-    #%%
-    def Energy_classifier(self, Xtest, Xtrain, ytrain, k, metric, batch_size=50):
-        ''' Not completed''' 
-        Ntest = Xtest.shape[0]
-        Ntrain = Xtrain.shape[0]
-        
-        # Transform according to metric
-        Xtest_t = self.transform(Xtest, metric, batch_size=batch_size)
-        Xtrain_t = self.transform(Xtrain, metric, batch_size=batch_size)
-        Xtest_t = np.reshape(Xtest_t, (Ntest, -1))
-        Xtrain_t = np.reshape(Xtrain_t, (Ntrain, -1))
-        
-        # Observations in euclidian space
-        Xtest_euclid = np.reshape(Xtest, (Ntest, -1))
-        Xtrain_euclid = np.reshape(Xtrain, (Ntrain, -1))
-        
-        # Loop over all possible classes
-        val = np.unique(ytrain) 
-        Dist = np.zeros((Ntest, len(val)))
-        count = 0
-        for c in val:
-            idx = np.where(c==ytrain)[0]
-            nbrs = NearestNeighbors(n_neighbors=k, algorithm='ball_tree')
-            nbrs.fit(Xtrain_euclid[idx])
-            _, indices = nbrs.kneighbors(Xtest_euclid)
-            
-            # Each test points target neighbour
-            idx_x = idx[indices] # Ntest x k
-            
-            # Get all distance between test and train
-            D = cdist(Xtest_t, Xtrain_t) # Ntest x Ntrain
-            
-            # Use linear index to get pull distances
-            idx_lin = idx_x.flatten() + [i*Ntrain for i in range(Ntest) for _ in range(k)]
-            D_tn = np.reshape(D.flatten()[idx_lin], idx_x.shape)
-            Dpull = np.sum(D_tn, axis=1)
-            
-            # Iterate over all 
-            Dpush = np.zeros((Ntest,))
-            for kk in range(k):
-                # Find all imposters
-                cond = np.logical_and((D.T<=1+D_tn[:,kk]).T, ytrain != c)
-                
-                # Sum all imposters
-                Dpush+=np.sum(np.where(cond, D, np.zeros_like(D)), axis=1)
-            mu = 0.5
-            Dist[count, :] = (1-mu)*Dpull + mu*Dpush
-        
-        min_c = np.argmin(Dist, axis=1)
-        return val[min_c]
-
-    #%%
-    def save_metric(self, filename, metric=None):
-        ''' Save the current metric to a file '''
-        metric = self.metric if metric is None else metric
-        np.save(self.dir_loc + '/' + filename, metric)
+    def evaluate(self, Xtest, Ytest, Xtrain, ytrain, k, batch_size=50):
+        ''' Evaluates the current metric
+        Arguments:
+            Xtest: M x ? metrix or tensor with test data for which we want to
+                   predict its classes for
+            Xtrain: N x ? matrix or tensor with training data
+            ytrain: N x 1 vector with class labels for the training data
+            k: scalar, number of neighbours to look at
+            batch_size: integer, number of samples to transform in parallel
+        Output
+            accuracy: scalar, accuracy of the prediction for the current metric
+        '''
+        pred = self.KNN_classifier(Xtest, Xtrain, ytrain, k, batch_size)
+        accuracy = np.mean(pred == Ytest)
+        return accuracy
     
-    #%%
-    def load_metric(self, filename):
-        ''' Load a metric from a file, and set It as the current metric '''
-        metric = np.load(filename)
-        self.metric = metric
-
-#%%
+    def save_weights(self, filename, step=None):
+        ''' Save all weights/variables in the current session to a file 
+        Arguments:
+            filename: str, name of the file to write to
+            step: integer, appended to the filename to distingues different saved
+                files from each other
+        '''
+        saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES))
+        saver.save(self.session, filename, global_step = step)
+            
+#%% 
 if __name__ == '__main__':
-    from helper import read_olivetti, read_mnist, test_set1
-    tf.InteractiveSession()
-    
-    # Get arguments
+    from helper import lmnn_argparser, read_olivetti
     args = lmnn_argparser()
     
-    # Prepare data
-    if args['ds'] == 'testset':
-        X_train, y_train, X_test, y_test = test_set1(size=50)
-        dim = 2
-    elif args['ds'] == 'olivetti':
-        X_train, y_train, X_test, y_test = read_olivetti(permute=True)
-        X_train = np.reshape(X_train, (280, -1))
-        X_test = np.reshape(X_test, (120, -1))
-        dim = 105
-        pca = PCA(n_components=dim)
-        X_train = pca.fit_transform(X_train)    
-        X_test = pca.transform(X_test)
-    elif args['ds'] == 'mnist2000':
-        X_train, y_train = read_mnist(dataset='training')
-        X_test, y_test = read_mnist(dataset='testing')
-        n1, n2 = 2000, 200
-        X_train = np.reshape(X_train[:n1], (n1, -1))
-        X_test = np.reshape(X_test[:n2], (n2, -1))
-        y_train = y_train[:n1]
-        y_test = y_train[:n2]
-        dim = 105
-        pca = PCA(n_components=dim)
-        X_train = pca.fit_transform(X_train)    
-        X_test = pca.transform(X_test)
-    elif args['ds'] == 'mnist5000':
-        X_train, y_train = read_mnist(dataset='training')
-        X_test, y_test = read_mnist(dataset='testing')   
-        n1, n2 = 5000, 500
-        X_train = np.reshape(X_train[:n1], (n1, -1))
-        X_test = np.reshape(X_test[:n2], (n2, -1))
-        y_train = y_train[:n1]
-        y_test = y_train[:n2]
-        dim = 105
-        pca = PCA(n_components=dim)
-        X_train = pca.fit_transform(X_train)    
-        X_test = pca.transform(X_test)
-    elif args['ds'] == 'mnist':
-        X_train, y_train = read_mnist(dataset='training')
-        X_test, y_test = read_mnist(dataset='testing')   
-        X_train = np.reshape(X_train, (60000, -1))
-        X_test = np.reshape(X_test, (10000, -1))
-        dim = 105
-        pca = PCA(n_components=dim)
-        X_train = pca.fit_transform(X_train)    
-        X_test = pca.transform(X_test)
-    elif args['ds'] == 'olivetti_conv':
-        X_train, y_train, X_test, y_test = read_olivetti(permute=False)
-        X_train = np.reshape(X_train, (-1, 64, 64, 1))
-        X_test = np.reshape(X_test, (-1, 64, 64, 1))
-    elif args['ds'] == 'mnist_conv':
-        X_train, y_train = read_mnist(dataset='training')
-        X_test, y_test = read_mnist(dataset='testing')
-        X_train = X_train[:,:,:,np.newaxis]
-        X_test = X_test[:,:,:,np.newaxis]
+    X_train, y_train, X_test, y_test = read_olivetti(permute=True)
+    X_train = np.reshape(X_train, (280, -1))
+    X_test = np.reshape(X_test, (120, -1))
+    dim = 105
+    pca = PCA(n_components=dim)
+    X_train = pca.fit_transform(X_train)    
+    X_test = pca.transform(X_test)
     
-    ms = get_transformer_struct(transformer=args['mt'], params=args['p'])
-    
-    lmnn = LMNN(metric_struct=ms, 
-                margin=args['m'], 
-                optimizer=args['o'],
-                verbose=args['v'])
+    # Define a function that takes a single input and outputs some transformation
+    # of that input. Remember to wrap in a variable_scope and use get_variable.
+    def tf_mahalanobisTransformer(X, scope='mahalanobis_transformer'):
+        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
+            X = tf.cast(X, tf.float32)
+            L = tf.get_variable("L", initializer=np.eye(dim, dim-50, dtype=np.float32))
+            return tf.matmul(X, L)
 
-    train_stats = lmnn.train(X_train, y_train, k=args['k'], mu=args['mu'], 
-                             maxEpoch=args['ne'], batch_size=args['bs'], 
-                             learning_rate=args['lr'], val_set=[X_test, y_test], 
-                             snapshot=args['ss'])
+    def tf_convTransformer(X, scope='conv_transformer'):
+        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
+            X = tf.cast(X, tf.float32)
+            W = tf.get_variable("W", initilizer=np.random.normal(size=(3,3,1,10), dtyep=np.float32))
+            return tf.nn.conv2D(X, W, strides=[1,1,1,1], "VALID")
+    lmnn.fit(X_train, y_train, k=2, mu=args['mu'], maxEpoch=args['ne'], 
+             batch_size=args['bs'], learning_rate=args['lr'], 
+             val_set=[X_test, y_test], snapshot=args['ss'])
+    # Define class
+    lmnn = LMNN(tf_mahalanobisTransformer, margin = args['m'], dir_loc = 'results',
+                optimizer=args['o'], verbose = args['v'])
+    
+    # Fit transformer
+    lmnn.fit(X_train, y_train, k=2, mu=args['mu'], maxEpoch=args['ne'], 
+             batch_size=args['bs'], learning_rate=args['lr'], 
+             val_set=[X_test, y_test], snapshot=args['ss'])
     
