@@ -9,6 +9,8 @@ Created on Wed Jan 10 10:40:30 2018
 #%%
 import tensorflow as tf
 import numpy as np
+from tensorflow.python.keras import Sequential
+from tensorflow.python.keras.layers import InputLayer, Dense
 
 #%%
 def tf_makePairwiseFunc(trans_func):
@@ -49,17 +51,6 @@ def tf_mahalanobisTransformer(X, scope='mahalanobis_transformer'):
         return tf.matmul(X, L)
 
 #%%
-def keras_mahalanobisTransformer(X, scope='mahalanobis_transformer'):
-    from tensorflow.python.keras import Sequential
-    from tensorflow.python.keras.layers import InputLayer, Dense
-    X = tf.cast(X, tf.float32)
-    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
-        S = Sequential()
-        S.add(InputLayer(input_shape=(50,)))
-        S.add(Dense(50, use_bias=False, kernel_initializer='identity'))
-        return S.call(X)
-
-#%%
 def tf_convTransformer(X, scope='conv_transformer'):
     """ Creates a transformer function that for an given input tensor X,
         computes the convolution of that tensor with some weights W. """
@@ -69,10 +60,50 @@ def tf_convTransformer(X, scope='conv_transformer'):
         return tf.nn.conv2d(X, W, strides=[1,1,1,1], padding="VALID")
 
 #%%
+def keras_mahalanobisTransformer(X, scope='mahalanobis_transformer'):
+    X = tf.cast(X, tf.float32)
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
+        S = Sequential()
+        S.add(InputLayer(input_shape=(50,)))
+        S.add(Dense(50, use_bias=False, kernel_initializer='identity'))
+        return S.call(X)
+
+#%%
+class KerasTransformer(object):
+    def __init__(self, input_shape):
+        self.func = Sequential()
+        self.func.add(InputLayer(input_shape=input_shape))
+    
+    def add(self, layer):
+        ''' Add keras layers to the sequential model '''
+        self.func.add(layer)
+    
+    def get_function(self, scope='transformer'):
+        ''' Get a function that can be used to extract features '''
+        def featureExtractor(X):
+            ''' Feature extractor function build from a keras sequential model '''
+            with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
+                return self.func.call(X)
+            
+        return featureExtractor
+        
+#%%
 if __name__ == '__main__':
     # Make sure that variables are shared
     X=tf.cast(np.random.normal(size=(100,50)), tf.float32)
-    keras_res1 = keras_mahalanobisTransformer(X)
-    keras_res2 = keras_mahalanobisTransformer(X)
-    if len(tf.trainable_variables())==1: print('succes!')
+    
+    tr = KerasTransformer(input_shape=(50,))
+    tr.add(Dense(50, use_bias=False, kernel_initializer='identity'))
+    tr.add(Dense(20, use_bias=False, kernel_initializer='identity'))
+    tr.add(Dense(10, use_bias=False, kernel_initializer='identity'))
+    trans_func1 = tr.get_function()
+    
+    res1=trans_func1(X)
+    res2=trans_func1(X)
+    
+    # Check that we only have created three variables
+    for w in tf.trainable_variables():
+        print(w)
+    
+    
     
