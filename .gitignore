@@ -2,3 +2,4 @@
 __pycache__
 dlmnn/data/data_files
 dlmnn/results
+dlmnn/helper/embedding_example

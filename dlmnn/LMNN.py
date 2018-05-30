@@ -486,8 +486,6 @@ if __name__ == '__main__':
     args = lmnn_argparser()
     
     X_train, y_train, X_test, y_test = get_olivetti()
-    X_train = np.reshape(X_train, (280, -1))
-    X_test = np.reshape(X_test, (120, -1))
 
     pca = PCA(n_components=50)
     X_train = pca.fit_transform(X_train)    

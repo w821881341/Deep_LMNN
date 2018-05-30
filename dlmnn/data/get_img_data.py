@@ -76,6 +76,10 @@ def get_olivetti():
     X_test = X_test[idx]
     y_test = y_test[idx]
     
+    # Reshape to image format
+    X_train = np.reshape(X_train, (280, 64, 64, 1))
+    X_test = np.reshape(X_test, (120, 64, 64, 1))
+    
     return X_train, y_train, X_test, y_test
 
 #%%
