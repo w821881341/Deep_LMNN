@@ -332,7 +332,7 @@ class lmnn(object):
             
             stats.on_epoch_end() # End epoch
             
-             # Check if we should terminate
+            # Check if we should terminate
             if stats.terminate: break
             
             # Write stats to console (if verbose=True)
