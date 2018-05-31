@@ -22,7 +22,7 @@ from dlmnn.helper.logger import stat_logger
 
 
 #%% Main Class
-class LMNN(object):
+class lmnn(object):
     def __init__(self, tf_transformer, margin=1, session=None, dir_loc=None,
                  optimizer='adam', verbose = 1):
         ''' Class for running the Large Margin Nearest Neighbour algorithm. 
@@ -193,6 +193,8 @@ class LMNN(object):
         if not os.path.exists(self.dir_loc): os.makedirs(self.dir_loc)
         if self.verbose == 2: 
             self.train_writer = tf.summary.FileWriter(loc + '/train')
+        
+        # Check for validation set
         validation = False
         if val_set:
             validation = True
@@ -201,11 +203,15 @@ class LMNN(object):
                 self.val_writer = tf.summary.FileWriter(loc + '/val')
         
         # Training parameters
+        Xtrain = Xtrain.astype('float32')
+        ytrain = ytrain.astype('int32')
         N_train = Xtrain.shape[0]
         n_batch_train = int(np.ceil(N_train / batch_size))
         print(50*'-')
         print('Number of training samples:    ', N_train)
         if validation:
+            Xval = Xval.astype('float32')
+            yval = yval.astype('int32')
             N_val = Xval.shape[0]
             n_batch_val = int(np.ceil(N_val / batch_size))
             print('Number of validation samples:  ', N_val)
@@ -286,12 +292,12 @@ class LMNN(object):
                 
             # Evaluate accuracy every 'snapshot' epoch (expensive to do) and
             # on the last epoch
-            if e % snapshot == 0 or e == maxEpoch-1:
-                acc = self.evaluate(Xtrain, ytrain, Xtrain, ytrain, k=k, batch_size=batch_size)
-                stats.add_stat('acc', acc)
-                if self.verbose==2:
-                    summ = tf.Summary(value=[tf.Summary.Value(tag='Accuracy', simple_value=acc)])
-                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
+#            if e % snapshot == 0 or e == maxEpoch-1:
+#                acc = self.evaluate(Xtrain, ytrain, Xtrain, ytrain, k=k, batch_size=batch_size)
+#                stats.add_stat('acc', acc)
+#                if self.verbose==2:
+#                    summ = tf.Summary(value=[tf.Summary.Value(tag='Accuracy', simple_value=acc)])
+#                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
             
             # Do validation if val_set is given and we are in the snapshot epoch
             # or at the last epoch
@@ -352,16 +358,21 @@ class LMNN(object):
         n_batch = int(np.ceil(N / batch_size))
         
         # Find the shape of the transformed data by transforming a single observation
-        X_new = self.session.run(self.transformer(X[:1]))
+        X_new = self.session.run(self.transformer(tf.cast(X[:1], tf.float32)))
         X_trans = np.zeros((N, *X_new.shape[1:]))
+        
+        # Graph
+        X_trans_p = tf.placeholder(tf.float32, (None, *X.shape[1:]), 'Xtrans_placeholder')
+        op = self.transformer(X_trans_p)
         
         # Transform data in batches
         for b in range(n_batch):
             X_batch = X[batch_size*b:batch_size*(b+1)]
-            X_batch_trans = self.transformer(X_batch)
-            X_trans[batch_size*b:batch_size*(b+1)] = self.session.run(X_batch_trans)
+            #X_batch_trans = self.transformer(tf.cast(X_batch, tf.float32))
+            #X_trans[batch_size*b:batch_size*(b+1)] = self.session.run(X_batch_trans)
+            X_trans[batch_size*b:batch_size*(b+1)] = self.session.run(
+                    op, feed_dict={X_trans_p: X_batch})
         return X_trans
-    
    
     def findTargetNeighbours(self, X, y, k, do_pca=True, name=''):
         ''' Numpy/sklearn implementation to find target neighbours for large 
@@ -397,7 +408,7 @@ class LMNN(object):
             n_c = len(idx)
             x = X[idx]
             # Find the nearest neighbours
-            nbrs = NearestNeighbors(n_neighbors=k+1, algorithm='ball_tree')
+            nbrs = NearestNeighbors(n_neighbors=k+1, algorithm='brute')
             nbrs.fit(x)
             _, indices = nbrs.kneighbors(x)
             for kk in range(1,k+1):
@@ -431,16 +442,15 @@ class LMNN(object):
         Xtrain_t = self.transform(Xtrain, batch_size=batch_size)
         Xtest_t = np.reshape(Xtest_t, (Ntest, -1))
         Xtrain_t = np.reshape(Xtrain_t, (Ntrain, -1))
-        
         same = np.array_equal(Xtest, Xtrain)
         if same: # if train and test is same, account for over estimation of
                  # performance by one more neighbour and zero weight to the first
             classifier = KNeighborsClassifier(n_neighbors = k+1, weights=weight_func, 
-                                              n_jobs=-1)
+                                              algorithm='brute')
             classifier.fit(Xtrain_t, ytrain)
             pred = classifier.predict(Xtest_t)
         else:
-            classifier = KNeighborsClassifier(n_neighbors = k, n_jobs=-1)
+            classifier = KNeighborsClassifier(n_neighbors = k, algorithm='brute')
             classifier.fit(Xtrain_t, ytrain)
             pred = classifier.predict(Xtest_t)
         return pred
@@ -478,3 +488,6 @@ class LMNN(object):
         weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         return self.session.run(weights)
     
+#%%
+if __name__ == '__main__':
+    pass
