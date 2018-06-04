@@ -7,7 +7,7 @@ Created on Thu May 31 11:14:21 2018
 """
 #%%
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.decomposition import PCA
 from dlmnn.helper.utility import progressBar
 
@@ -57,3 +57,41 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=''):
     print('')
     print(50*'-')
     return tN
+
+#%%
+def _weight_func(distances):
+    """ Simple weight function, that accounts for over estimatation of performance
+        when a KNN classifier is used to evaluate the same set it was trained on """
+    N, d = distances.shape
+    if distances[0,0] != 0:
+        w=1.0/d*np.ones((N,d))
+    else:
+        w=np.concatenate([np.zeros((N,1)), 1.0/(N-1)*np.ones((N,d-1))], axis=1)
+    return w
+
+#%%
+def knnClassifier(Xtest, Xtrain, ytrain, k):
+    """ Special KNN-classifier that takes care of the case when Xtest==Xtrain,
+        such that performance is not overestimated in this case.
+    Arguments:
+        Xtest:
+        Xtrain:
+        ytrain:
+        k:
+    """
+    Ntest = Xtest.shape[0]
+    Ntrain = Xtrain.shape[0]
+    Xtest = np.reshape(Xtest, (Ntest, -1))
+    Xtrain = np.reshape(Xtrain, (Ntrain, -1))
+    same = np.array_equal(Xtest, Xtrain)
+    if same: # if train and test is same, account for over estimation of
+             # performance by one more neighbour and zero weight to the first
+        classifier = KNeighborsClassifier(n_neighbors = k+1, weights=_weight_func, 
+                                          algorithm='brute')
+        classifier.fit(Xtrain, ytrain)
+        pred = classifier.predict(Xtest)
+    else:
+        classifier = KNeighborsClassifier(n_neighbors = k, algorithm='brute')
+        classifier.fit(Xtrain, ytrain)
+        pred = classifier.predict(Xtest)
+    return pred

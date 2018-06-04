@@ -17,7 +17,7 @@ from sklearn.decomposition import PCA
 
 from dlmnn.helper.tf_funcs import tf_makePairwiseFunc
 from dlmnn.helper.utility import get_optimizer, progressBar
-from dlmnn.helper.maths import weight_func
+from dlmnn.helper.neighbor_funcs import _weight_func as weight_func
 from dlmnn.helper.logger import stat_logger
 
 
@@ -483,10 +483,10 @@ class lmnn(object):
         saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
         saver.save(self.session, self.dir_loc+'/'+filename, global_step = step)
     
-    @property
     def get_weights(self):
         weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         return self.session.run(weights)
+    
     
 #%%
 if __name__ == '__main__':

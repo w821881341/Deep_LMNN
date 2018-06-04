@@ -7,7 +7,7 @@ Created on Thu May 31 10:11:15 2018
 """
 
 #%%
-from dlmnn.helper.neighbor_funcs import findTargetNeighbours
+from dlmnn.helper.neighbor_funcs import findTargetNeighbours, knnClassifier
 from dlmnn.helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters, \
                                     tf_LMNN_loss, tf_featureExtractor
 from dlmnn.helper.logger import stat_logger
@@ -20,15 +20,19 @@ import datetime, os
 
 class lmnn(object):
     #%%
-    def __init__(self, session=None, dir_loc=None):
+    def __init__(self, k, session=None, dir_loc=None):
+        # Set number of neighbours
+        self.k = k
+        
         # Initilize session and tensorboard dirs 
         self.session = tf.Session() if session is None else session
         self.dir_loc = './logs' if dir_loc is None else dir_loc
-        self.train_writer = None
-        self.val_writer = None
         
         # Initialize feature extractor
         self.extractor = Sequential()
+        
+        # Set idication for when model is build
+        self.built = False
     
     #%%        
     def add(self, layer):
@@ -38,6 +42,8 @@ class lmnn(object):
     #%%    
     def build(self, optimizer='adam', learning_rate = 1e-4, mu=0.5, margin=1):
         """       """
+        self.built = True
+        
         # Shapes
         self.input_shape = self.extractor.input_shape
         self.output_shape = self.extractor.output_shape
@@ -74,16 +80,22 @@ class lmnn(object):
         tf.summary.scalar('Frac_true_imp', tf.reduce_mean(true_imp))
         self._summary = tf.summary.merge_all()
         
-        # Initilize
+        # Initilize session
         init = tf.global_variables_initializer()
         self.session.run(init)
         
+        # Create callable functions
+        self.transformer = self.session.make_callable(
+                self.extractor_func(self.Xp), [self.Xp])
+        
     #%%
-    def fit(self, Xtrain, ytrain, k=3, maxEpoch=100, 
-            batch_size=50, val_set=None, run_id=None):
+    def fit(self, Xtrain, ytrain, maxEpoch=100, 
+            batch_size=50, val_set=None, run_id=None,
+            snapshot=10):
         """
         
         """
+        self._assert_if_build()
         # Tensorboard file writers
         run_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M') if run_id \
                  is None else run_id
@@ -117,9 +129,9 @@ class lmnn(object):
         print(50*'-')
         
         # Target neighbours
-        tN = findTargetNeighbours(Xtrain, ytrain, k, name='Training')
+        tN = findTargetNeighbours(Xtrain, ytrain, self.k, name='Training')
         if validation:
-            tN_val = findTargetNeighbours(Xval, yval, k, name='Validation')
+            tN_val = findTargetNeighbours(Xval, yval, self.k, name='Validation')
     
         # Training loop
         stats = stat_logger(maxEpoch, n_batch_train, verbose=self.verbose)
@@ -135,7 +147,8 @@ class lmnn(object):
                 stats.on_batch_begin() # Start batch
                 
                 # Get data
-                feed_dict = self._get_feed_dict(k*batch_size*b, k*batch_size*(b+1),
+                feed_dict = self._get_feed_dict(self.k*batch_size*b, 
+                                                self.k*batch_size*(b+1),
                                                 Xtrain, ytrain, tN)
     
                 # Evaluate graph
@@ -152,6 +165,43 @@ class lmnn(object):
                 if self.verbose==2: 
                     self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
                 stats.on_batch_end() # End batch
+            
+            # Evaluate accuracy every 'snapshot' epoch (expensive to do) and
+            # on the last epoch
+            if e % snapshot == 0 or e == maxEpoch-1:
+                acc = self.evaluate(Xtrain, ytrain, Xtrain, ytrain, k=self.k, batch_size=batch_size)
+                stats.add_stat('acc', acc)
+                if self.verbose==2:
+                    summ = tf.Summary(value=[tf.Summary.Value(tag='Accuracy', simple_value=acc)])
+                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
+            
+            # Evaluation of validation data
+            if validation and (e % snapshot == 0 or e == maxEpoch-1):
+                # Evaluate loss and tuples on val data
+                tN_val = np.random.permutation(tN_val)
+                for b in range(n_batch_val):
+                    feed_dict = self._get_feed_dict(self.k*batch_size*b, 
+                                                    self.k*batch_size*(b+1),
+                                                    Xval, yval, tN)
+                    loss_out, ntup_out = self.session.run([self._LMNN_loss, self._n_tup], 
+                                                          feed_dict=feed_dict)
+                    stats.add_stat('loss_val', loss_out)
+                    stats.add_stat('#imp_val', ntup_out)
+                
+                # Compute accuracy
+                acc = self.evaluate(Xval, yval, Xtrain, ytrain, k=self.k, batch_size=batch_size)
+                stats.add_stat('acc_val', acc)
+                
+                if self.verbose==2:
+                    # Write stats to summary protocol buffer
+                    summ = tf.Summary(value=[
+                        tf.Summary.Value(tag='Loss', simple_value=np.mean(stats.get_stat('loss_val'))),
+                        tf.Summary.Value(tag='NumberOfImposters', simple_value=np.mean(stats.get_stat('#imp_val'))),
+                        tf.Summary.Value(tag='Accuracy', simple_value=np.mean(stats.get_stat('acc_val')))])
+             
+                    # Save to tensorboard
+                    self.val_writer.add_summary(summ, global_step=n_batch_train*e)
+            
             
             stats.on_epoch_end() # End epoch
             
@@ -170,16 +220,53 @@ class lmnn(object):
                 
                 
     #%%
-    def transform(self, ):
-        pass
+    def transform(self, X, batch_size=64):
+        ''' Transform the data in X
+        Arguments:
+            X: N x ?, matrix or tensor of data
+            batch_size: scalar, number of samples to transform in parallel
+        Output:
+            X_trans: N x ?, matrix or tensor with the transformed data
+        '''
+        self._assert_if_build()
+        # Parameters for transformer
+        N = X.shape[0]
+        n_batch = int(np.ceil(N / batch_size))
+        X_trans = np.zeros((N, *self.output_size))
+        
+        # Transform data in batches
+        for b in range(n_batch):
+            X_batch = X[batch_size*b:batch_size*(b+1)]
+            X_trans[batch_size*b:batch_size*(b+1)] = self.transformer(X_batch)
+        return X_trans
     
     #%%    
-    def predict(self, ):
-        pass
+    def predict(self, Xtest, Xtrain, ytrain, batch_size=64):
+        self._assert_if_build()
+        Xtest = self.transform(Xtest, batch_size=batch_size)
+        Xtrain = self.transform(Xtest, batch_size=batch_size)
+        pred = knnClassifier(Xtest, Xtrain, ytrain, self.k)
+        return pred
     
     #%%
-    def evaluate(self, ):
-        pass
+    def evaluate(self, Xtest, ytest, Xtrain, ytrain, batch_size=64):
+        ''' Evaluates the current metric
+        
+        Arguments:
+            Xtest: M x ? metrix or tensor with test data for which we want to
+                   predict its classes for
+            Xtrain: N x ? matrix or tensor with training data
+            ytrain: N x 1 vector with class labels for the training data
+            k: scalar, number of neighbours to look at
+            batch_size: integer, number of samples to transform in parallel
+        
+        Output
+            accuracy: scalar, accuracy of the prediction for the current metric
+        '''
+        self._assert_if_build()
+        pred=self.predict(Xtest, Xtrain, ytrain, batch_size=batch_size)
+        accuracy = np.mean(pred == ytest)
+        return accuracy
     
     #%%
     def save_weights(self, filename, step=None):
@@ -189,14 +276,21 @@ class lmnn(object):
             step: integer, appended to the filename to distingues different saved
                 files from each other
         '''
+        self._assert_if_build()
         saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
         saver.save(self.session, self.dir_loc+'/'+filename, global_step = step)
     
     #%%
     def get_weights(self):
         """ Returns a list of weights in the current graph """
+        self._assert_if_build()
         weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         return self.session.run(weights)
+
+    #%%
+    def summary(self):
+        self._assert_if_build()
+        self.extractor.summary()
     
     #%%
     def _get_feed_dict(self, idx_start, idx_end, tN, X, y):
@@ -207,16 +301,31 @@ class lmnn(object):
         y_batch = y[idx]
         feed_dict = {self.Xp: X_batch, self.yp: y_batch, self.tNp: inv_idx}
         return feed_dict
+   
+    #%%
+    def _assert_if_build(self):
+        assert self.built, '''Model is not build, call lmnn.build() 
+                before this function is called '''
     
 #%%
 if __name__ == '__main__':
     from tensorflow.python.keras.layers import Dense, InputLayer
-    # Construct model
-    model = lmnn()
+    from dlmnn.data.get_img_data import get_olivetti
     
+    # Data
+    #Xtrain, ytrain, Xtest, ytest = get_olivetti()
+    
+    # Construct model
+    model = lmnn(k=2)
+
     # Add feature extraction layers
     model.add(InputLayer(input_shape=(50,)))
     model.add(Dense(20, use_bias=False, kernel_initializer='identity'))
     
     # Build graph
-    model.build(optimizer='adam')
+    model.build(optimizer='adam', learning_rate=1e-4)
+    
+    # Fit model
+    #model.fit(Xtrain, ytrain)
+    
+    
