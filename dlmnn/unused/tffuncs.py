@@ -32,25 +32,6 @@ def keras_mahalanobisTransformer(X, scope='mahalanobis_transformer'):
         S.add(InputLayer(input_shape=(50,)))
         S.add(Dense(50, use_bias=False, kernel_initializer='identity'))
         return S.call(X)
-
-#%%
-class KerasTransformer(object):
-    def __init__(self, input_shape):
-        self.func = Sequential()
-        self.func.add(InputLayer(input_shape=input_shape))
-    
-    def add(self, layer):
-        ''' Add keras layers to the sequential model '''
-        self.func.add(layer)
-    
-    def get_function(self, scope='transformer'):
-        ''' Get a function that can be used to extract features '''
-        def featureExtractor(X):
-            ''' Feature extractor function build from a keras sequential model '''
-            with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
-                return self.func.call(X)
-            
-        return featureExtractor
         
 #%%
 if __name__ == '__main__':

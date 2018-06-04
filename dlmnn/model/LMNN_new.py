@@ -18,12 +18,10 @@ from tensorflow.python.keras import Sequential
 import numpy as np
 import datetime, os
 
+#%%
 class lmnn(object):
-    #%%
-    def __init__(self, k, session=None, dir_loc=None):
-        # Set number of neighbours
-        self.k = k
-        
+    """   """
+    def __init__(self, session=None, dir_loc=None):
         # Initilize session and tensorboard dirs 
         self.session = tf.Session() if session is None else session
         self.dir_loc = './logs' if dir_loc is None else dir_loc
@@ -40,9 +38,16 @@ class lmnn(object):
         self.extractor.add(layer)
     
     #%%    
-    def build(self, optimizer='adam', learning_rate = 1e-4, mu=0.5, margin=1):
+    def build(self, k=1, optimizer='adam', learning_rate = 1e-4, 
+              mu=0.5, margin=1):
         """       """
+        assert len(self.extractor.layers)!=0, '''Layers must be added with the 
+                lmnn.add() method before this function is called '''
+        
         self.built = True
+        
+        # Set number of neighbours
+        self.k = k        
         
         # Shapes
         self.input_shape = self.extractor.input_shape
@@ -91,7 +96,7 @@ class lmnn(object):
     #%%
     def fit(self, Xtrain, ytrain, maxEpoch=100, 
             batch_size=50, val_set=None, run_id=None,
-            snapshot=10):
+            verbose=1, snapshot=10):
         """
         
         """
@@ -101,7 +106,7 @@ class lmnn(object):
                  is None else run_id
         loc = self.dir_loc + '/' + run_id
         if not os.path.exists(self.dir_loc): os.makedirs(self.dir_loc)
-        if self.verbose == 2: 
+        if verbose == 2: 
             self.train_writer = tf.summary.FileWriter(loc + '/train')
             self.train_writer.add_graph(self.session.graph)
             if val_set:
@@ -134,7 +139,7 @@ class lmnn(object):
             tN_val = findTargetNeighbours(Xval, yval, self.k, name='Validation')
     
         # Training loop
-        stats = stat_logger(maxEpoch, n_batch_train, verbose=self.verbose)
+        stats = stat_logger(maxEpoch, n_batch_train, verbose=verbose)
         stats.on_train_begin() # Start training
         for e in range(maxEpoch):
             stats.on_epoch_begin() # Start epoch
@@ -162,18 +167,18 @@ class lmnn(object):
                 stats.add_stat('#imp', ntup_out)
                 
                 # Save to tensorboard
-                if self.verbose==2: 
+                if verbose==2: 
                     self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
                 stats.on_batch_end() # End batch
             
-            # Evaluate accuracy every 'snapshot' epoch (expensive to do) and
-            # on the last epoch
-            if e % snapshot == 0 or e == maxEpoch-1:
-                acc = self.evaluate(Xtrain, ytrain, Xtrain, ytrain, k=self.k, batch_size=batch_size)
-                stats.add_stat('acc', acc)
-                if self.verbose==2:
-                    summ = tf.Summary(value=[tf.Summary.Value(tag='Accuracy', simple_value=acc)])
-                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
+#            # Evaluate accuracy every 'snapshot' epoch (expensive to do) and
+#            # on the last epoch
+#            if e % snapshot == 0 or e == maxEpoch-1:
+#                acc = self.evaluate(Xtrain, ytrain, Xtrain, ytrain, k=self.k, batch_size=batch_size)
+#                stats.add_stat('acc', acc)
+#                if self.verbose==2:
+#                    summ = tf.Summary(value=[tf.Summary.Value(tag='Accuracy', simple_value=acc)])
+#                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
             
             # Evaluation of validation data
             if validation and (e % snapshot == 0 or e == maxEpoch-1):
@@ -182,17 +187,17 @@ class lmnn(object):
                 for b in range(n_batch_val):
                     feed_dict = self._get_feed_dict(self.k*batch_size*b, 
                                                     self.k*batch_size*(b+1),
-                                                    Xval, yval, tN)
+                                                    Xval, yval, tN_val)
                     loss_out, ntup_out = self.session.run([self._LMNN_loss, self._n_tup], 
                                                           feed_dict=feed_dict)
                     stats.add_stat('loss_val', loss_out)
                     stats.add_stat('#imp_val', ntup_out)
                 
                 # Compute accuracy
-                acc = self.evaluate(Xval, yval, Xtrain, ytrain, k=self.k, batch_size=batch_size)
+                acc = self.evaluate(Xval, yval, Xtrain, ytrain, batch_size=batch_size)
                 stats.add_stat('acc_val', acc)
                 
-                if self.verbose==2:
+                if verbose==2:
                     # Write stats to summary protocol buffer
                     summ = tf.Summary(value=[
                         tf.Summary.Value(tag='Loss', simple_value=np.mean(stats.get_stat('loss_val'))),
@@ -232,7 +237,7 @@ class lmnn(object):
         # Parameters for transformer
         N = X.shape[0]
         n_batch = int(np.ceil(N / batch_size))
-        X_trans = np.zeros((N, *self.output_size))
+        X_trans = np.zeros((N, *self.output_shape[1:]))
         
         # Transform data in batches
         for b in range(n_batch):
@@ -244,7 +249,7 @@ class lmnn(object):
     def predict(self, Xtest, Xtrain, ytrain, batch_size=64):
         self._assert_if_build()
         Xtest = self.transform(Xtest, batch_size=batch_size)
-        Xtrain = self.transform(Xtest, batch_size=batch_size)
+        Xtrain = self.transform(Xtrain, batch_size=batch_size)
         pred = knnClassifier(Xtest, Xtrain, ytrain, self.k)
         return pred
     
@@ -264,7 +269,7 @@ class lmnn(object):
             accuracy: scalar, accuracy of the prediction for the current metric
         '''
         self._assert_if_build()
-        pred=self.predict(Xtest, Xtrain, ytrain, batch_size=batch_size)
+        pred = self.predict(Xtest, Xtrain, ytrain, batch_size=batch_size)
         accuracy = np.mean(pred == ytest)
         return accuracy
     
@@ -293,7 +298,7 @@ class lmnn(object):
         self.extractor.summary()
     
     #%%
-    def _get_feed_dict(self, idx_start, idx_end, tN, X, y):
+    def _get_feed_dict(self, idx_start, idx_end, X, y, tN):
         tN_batch = tN[idx_start:idx_end]
         idx, inv_idx = np.unique(tN_batch, return_inverse=True)
         inv_idx = np.reshape(inv_idx, (-1, 2))
@@ -316,14 +321,14 @@ if __name__ == '__main__':
     #Xtrain, ytrain, Xtest, ytest = get_olivetti()
     
     # Construct model
-    model = lmnn(k=2)
+    model = lmnn()
 
     # Add feature extraction layers
-    model.add(InputLayer(input_shape=(50,)))
-    model.add(Dense(20, use_bias=False, kernel_initializer='identity'))
+    #model.add(InputLayer(input_shape=(50,)))
+    #model.add(Dense(20, use_bias=False, kernel_initializer='identity'))
     
     # Build graph
-    model.build(optimizer='adam', learning_rate=1e-4)
+    #model.build(optimizer='adam', learning_rate=1e-4)
     
     # Fit model
     #model.fit(Xtrain, ytrain)

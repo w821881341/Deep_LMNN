@@ -134,3 +134,24 @@ def tf_LMNN_loss(D, tN, tup, mu, margin=1):
         # Total loss
         loss = (1-mu) * pull_loss + mu * push_loss
         return loss, D_pull, D_tn, D_im
+
+#%%
+from tensorflow.python.keras import Sequential
+from tensorflow.python.keras.layers import InputLayer
+class KerasTransformer(object):
+    def __init__(self, input_shape):
+        self.func = Sequential()
+        self.func.add(InputLayer(input_shape=input_shape))
+    
+    def add(self, layer):
+        ''' Add keras layers to the sequential model '''
+        self.func.add(layer)
+    
+    def get_function(self, scope='transformer'):
+        ''' Get a function that can be used to extract features '''
+        def featureExtractor(X):
+            ''' Feature extractor function build from a keras sequential model '''
+            with tf.variable_scope(scope, reuse=tf.AUTO_REUSE, values=[X]):
+                return self.func.call(X)
+            
+        return featureExtractor
