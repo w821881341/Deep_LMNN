@@ -11,9 +11,6 @@ from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 import matplotlib.pyplot as plt
 
-from dlmnn.data.get_img_data import get_olivetti
-from dlmnn.helper.utility import create_dir
-
 #%%
 def create_sprite(imgs):
     """ From a tensor of images, create a single sprite image """
@@ -35,7 +32,7 @@ def write_metadata(filename, labels):
             f.write("%d\t%d\n" % (index,label))
 
 #%%
-def embedding_projector(embedding_var, path, imgs=None, labels=None):
+def embedding_projector(np_tensor, folder, imgs=None, labels=None):
     """ Tensorboard embedding projector
     Arguments:
         embedding_var: tensorboard variable to embed
@@ -45,6 +42,13 @@ def embedding_projector(embedding_var, path, imgs=None, labels=None):
         labels (optional): if data is labeled, these can be given, such that
             embeddings can be colored
     """
+    tf_tensor = tf.cast(np_tensor, tf.float32)
+    embedding_var = tf.Variable(tf_tensor, name='embedding')
+    with tf.Session() as sess: 
+        sess.run(tf.global_variables_initializer()) 
+        saver = tf.train.Saver([embedding_var]) 
+        saver.save(sess, folder + '/embeddings.ckpt') 
+    
     config = projector.ProjectorConfig()
     embedding = config.embeddings.add()
     embedding.tensor_name = embedding_var.name 
@@ -53,52 +57,18 @@ def embedding_projector(embedding_var, path, imgs=None, labels=None):
     if imgs is not None:
         s, h, w, nc = create_sprite(imgs)
         s = s[:,:,0] if nc == 1 else s
-        plt.imsave(path + '/sprite.png', s, cmap='gray' if nc==1 else 'color')
+        plt.imsave(folder + '/sprite.png', s, cmap='gray' if nc==1 else 'color')
         embedding.sprite.image_path = 'sprite.png'
         embedding.sprite.single_image_dim.extend([w, h])
     
     # labels are supplied, create metadata        
     if labels is not None:
-        write_metadata(path + '/metadata.tsv', labels)
+        write_metadata(folder + '/metadata.tsv', labels)
         embedding.metadata_path = 'metadata.tsv'
     
     # Connect summary writer with projector
-    summary_writer = tf.summary.FileWriter(path)
+    summary_writer = tf.summary.FileWriter(folder)
     projector.visualize_embeddings(summary_writer, config)
     
     # Close
     summary_writer.close()
-    
-    
-#%%
-if __name__ == '__main__':
-    # Set folder where results will be saved
-    folder = 'embedding_example'
-    create_dir(folder)
-    
-    Xtrain, Ytrain, Xtest, Ytest = get_olivetti()
-    X = np.reshape(Xtrain, (280, -1))
-    Y = Ytrain
-    
-    # Embed training set
-    embedding_var = tf.Variable(tf.cast(X, tf.float32), name='embedding')
-
-    # Run session where variable is initialized, then save session        
-    with tf.Session() as sess:
-        writer = tf.summary.FileWriter('')
-        sess.run(tf.global_variables_initializer())
-        saver = tf.train.Saver([embedding_var])
-        saver.save(sess, folder + '/model.ckpt')
-
-    embedding_projector(embedding_var, 
-                        path=folder, 
-                        imgs=Xtrain, 
-                        labels=Y)
-    
-    
-    
-    
-    
-
-
-    

@@ -60,7 +60,7 @@ class stat_logger(object):
         self.end_train = time.time()
         self.total_train_time = self.end_train - self.start_train
         self._writer(70*'=' + '\n')
-        self._writer('Total train time: {0:0.1f}s'.format(self.total_train_time))
+        self._writer('Total train time: {0:0.1f}s \n'.format(self.total_train_time))
     
     def on_epoch_begin(self):
         ''' Call on the beginning of an epoch '''

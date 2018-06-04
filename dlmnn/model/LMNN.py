@@ -12,6 +12,7 @@ from dlmnn.helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters
 from dlmnn.helper.tf_funcs import tf_LMNN_loss, tf_featureExtractor
 from dlmnn.helper.logger import stat_logger
 from dlmnn.helper.utility import get_optimizer
+from dlmnn.helper.embeddings import embedding_projector
 
 import tensorflow as tf
 from tensorflow.python.keras import Sequential
@@ -83,7 +84,7 @@ class lmnn(object):
         tf.summary.scalar('True_imp', tf.reduce_sum(true_imp))
         tf.summary.scalar('Frac_true_imp', tf.reduce_mean(true_imp))
         self._summary = tf.summary.merge_all()
-        
+               
         # Initilize session
         init = tf.global_variables_initializer()
         self.session.run(init)
@@ -276,6 +277,12 @@ class lmnn(object):
         saver.save(self.session, self.dir_loc+'/'+filename, global_step = step)
     
     #%%
+    def save_embeddings(self, data, direc, imgs=None, labels=None):
+        embeddings = self.transform(data)
+        embedding_projector(embeddings, self.dir_loc+'/'+direc,
+                            imgs=imgs, labels=labels)
+    
+    #%%
     def get_weights(self):
         """ Returns a list of weights in the current graph """
         self._assert_if_build()
@@ -304,18 +311,12 @@ class lmnn(object):
     
 #%%
 if __name__ == '__main__':
-    from tensorflow.python.keras.layers import Dense, InputLayer
-    from dlmnn.data.get_img_data import get_olivetti
-    
-    # Data
-    #Xtrain, ytrain, Xtest, ytest = get_olivetti()
-    
     # Construct model
     model = lmnn()
 
     # Add feature extraction layers
-    #model.add(InputLayer(input_shape=(50,)))
-    #model.add(Dense(20, use_bias=False, kernel_initializer='identity'))
+    model.add(InputLayer(input_shape=(50,)))
+    model.add(Dense(20, use_bias=False, kernel_initializer='identity'))
     
     # Build graph
     #model.build(optimizer='adam', learning_rate=1e-4)

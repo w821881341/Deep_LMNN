@@ -5,8 +5,6 @@ Created on Tue Dec 12 11:23:37 2017
 @author: nsde
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
 import os, sys
 

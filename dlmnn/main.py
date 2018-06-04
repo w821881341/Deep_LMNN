@@ -14,6 +14,8 @@ from tensorflow.python.keras.optimizers import Adam
 from tensorflow.python.keras.layers import Conv2D, MaxPool2D, Dense, InputLayer, Flatten
 from tensorflow.python.keras.utils import to_categorical
 
+from dlmnn.helper.embeddings import embedding_projector
+
 #%%
 def argparser( ):
     import argparse 
@@ -30,6 +32,8 @@ if __name__ == '__main__':
     
     # Get some data
     X_train, y_train, X_test, y_test = get_mnist()
+    X_train = X_train[:10000]
+    y_train = y_train[:10000]
     
     import tensorflow as tf
     with tf.device("/cpu:0"):
@@ -47,8 +51,14 @@ if __name__ == '__main__':
                           loss='categorical_crossentropy', 
                           metrics=['accuracy'])
             model.fit(X_train, to_categorical(y_train, 10), 
-                      epochs=20,
+                      epochs=1,
                       validation_data=(X_test, to_categorical(y_test, 10)))
+            
+            from tensorflow.python.keras.backend import function
+            extractor = function([model.input], [model.layers[-2].output])
+            X_trans = extractor([X_train[:100]])[0]
+            embedding_projector(X_trans, 'logs/', imgs=X_train[:100], labels=y_train[:100])
+            
         # Construct and train lmnn net
         elif mtype == 'lmnn':
             model = lmnn()
@@ -61,6 +71,6 @@ if __name__ == '__main__':
             model.build(k=2, optimizer='adam', learning_rate=1e-4, 
                         mu=0.5, margin=1)
             model.fit(X_train, y_train, 
-                      maxEpoch=50, batch_size=100,
+                      maxEpoch=1, batch_size=100,
                       val_set=[X_test, y_test], snapshot=5)
         
