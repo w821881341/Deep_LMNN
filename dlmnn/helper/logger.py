@@ -36,7 +36,7 @@ class stat_logger(object):
         self.start_train, self.end_train, self.total_train_time = 0,0,0
         self.start_epoch, self.end_epoch, self.epoch_train_time = 0,0,0
         self.start_batch, self.end_batch, self.batch_train_time = 0,0,0
-        self.eta = 0
+        self.eta = [ ]
         
         # Counters
         self.epoch, self.batch = 0, 0
@@ -46,11 +46,10 @@ class stat_logger(object):
         self.loss_means, self.old_loss, self.new_loss = [], 0, 0
         self.tolerance, self.terminate = terminate_tol, False
         
-        # Printing
-        self.output_e = None
-        self.output_b = None
-        self.output_0 = None
-    
+        # Printing stuff
+        self.output_e = self.output_b = None
+        self.output_0 = self.output_1 = None
+        
     def on_train_begin(self):
         ''' Call on beginning of training '''
         self.start_train = time.time()
@@ -87,8 +86,8 @@ class stat_logger(object):
             print('No significant change in loss, terminating!')
             self.terminate = True
         self.old_loss = self.new_loss
-        self._writer('\r' + self.output_e + self.output_b + 
-                    'Time: {0:3.2f}s,  '.format(self.epoch_train_time))
+        self._writer(('\r' + self.output_e + self.output_b + 'Time: {0:3.2f}s' +
+                     '                   ').format(self.epoch_train_time))
     
     def on_batch_begin(self):
         ''' Call in the beginning of a batch '''
@@ -109,9 +108,12 @@ class stat_logger(object):
             self.terminate = True
             sys.exit()
             
-        self.eta = (self.n_batch - self.batch + 1)*self.batch_train_time
-        self.output_0 = 'eta: ' + str(np.round(self.eta, 2)) + 's'
-        self._writer('\r' + self.output_e + self.output_b + self.output_0)
+        self.eta.append(self.batch_train_time) 
+        self.output_0 = 'ETA: ' + str(np.round(np.mean(self.eta)*
+                    (self.n_batch - self.batch + 1), 2)) + 's, '
+        self.output_1 = 'loss: '+str(np.round(self.data[self.epoch]['loss'][-1],3))
+        self._writer('\r' + self.output_e + self.output_b 
+                         + self.output_0 + self.output_1)
     
     def add_stat(self, name, value, epoch=None, verbose=True):
         ''' 

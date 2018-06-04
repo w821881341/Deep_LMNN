@@ -1,2 +1,0 @@
-model_checkpoint_path: "trained_metric"
-all_model_checkpoint_paths: "trained_metric"

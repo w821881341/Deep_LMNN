@@ -1,5 +1,5 @@
 .spyproject
 __pycache__
 dlmnn/data/data_files
-dlmnn/results
+dlmnn/logs
 dlmnn/helper/embedding_example
