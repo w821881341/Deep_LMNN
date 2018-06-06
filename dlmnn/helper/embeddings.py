@@ -32,7 +32,7 @@ def write_metadata(filename, labels):
             f.write("%d\t%d\n" % (index,label))
 
 #%%
-def embedding_projector(np_tensor, folder, imgs=None, labels=None):
+def embedding_projector(np_tensor, folder, name='embedding', imgs=None, labels=None):
     """ Tensorboard embedding projector
     Arguments:
         embedding_var: tensorboard variable to embed
@@ -43,11 +43,11 @@ def embedding_projector(np_tensor, folder, imgs=None, labels=None):
             embeddings can be colored
     """
     tf_tensor = tf.cast(np_tensor, tf.float32)
-    embedding_var = tf.Variable(tf_tensor, name='embedding')
+    embedding_var = tf.Variable(tf_tensor, name=name)
     with tf.Session() as sess: 
         sess.run(tf.global_variables_initializer()) 
         saver = tf.train.Saver([embedding_var]) 
-        saver.save(sess, folder + '/embeddings.ckpt') 
+        saver.save(sess, folder + '/' + name + '.ckpt') 
     
     config = projector.ProjectorConfig()
     embedding = config.embeddings.add()
@@ -57,17 +57,17 @@ def embedding_projector(np_tensor, folder, imgs=None, labels=None):
     if imgs is not None:
         s, h, w, nc = create_sprite(imgs)
         s = s[:,:,0] if nc == 1 else s
-        plt.imsave(folder + '/sprite.png', s, cmap='gray' if nc==1 else 'color')
-        embedding.sprite.image_path = 'sprite.png'
+        plt.imsave(folder + '/'+name+'_sprite.png', s, cmap='gray' if nc==1 else 'color')
+        embedding.sprite.image_path = name+'_sprite.png'
         embedding.sprite.single_image_dim.extend([w, h])
     
     # labels are supplied, create metadata        
     if labels is not None:
-        write_metadata(folder + '/metadata.tsv', labels)
-        embedding.metadata_path = 'metadata.tsv'
+        write_metadata(folder + '/'+name+'_metadata.tsv', labels)
+        embedding.metadata_path = name+'_metadata.tsv'
     
     # Connect summary writer with projector
-    summary_writer = tf.summary.FileWriter(folder)
+    summary_writer = tf.summary.FileWriter(folder, filename_suffix=name)
     projector.visualize_embeddings(summary_writer, config)
     
     # Close
