@@ -14,6 +14,26 @@ import numpy as _np
 import urllib as _urllib
 
 #%%
+def get_devanagari():
+    url1 = 'https://raw.githubusercontent.com/sknepal/DHDD_CSV/master/train.csv'
+    url2 = 'https://raw.githubusercontent.com/sknepal/DHDD_CSV/master/test.csv'
+    direc = _get_dir(__file__)
+    _create_dir(direc+'/data_files')
+    for url in [url1, url2]:
+        file_name = 'devanagari_'+url.split('/')[-1]
+        if not _os.path.isfile(direc+'/data_files/'+file_name):
+            print('Downloading the ' + file_name + ' dataset')
+            _urllib.request.urlretrieve(url, direc+'/data_files/'+file_name)
+    
+    train = _np.genfromtxt(direc+'/data_files/'+'devanagari_train.csv', delimiter=',')
+    test = _np.genfromtxt(direc+'/data_files/'+'devanagari_test.csv', delimiter=',')
+    X_train = _np.reshape(train[:,1:], (-1, 32, 32, 1))
+    X_test = _np.reshape(test[:,1:], (-1, 32, 32, 1))
+    y_train = _np.reshape(train[:,0], (-1, ))
+    y_test = _np.reshape(test[:,0], (-1, ))
+    return X_train, y_train, X_test, y_test     
+    
+#%%
 def get_mnist():
     """ Downloads mnist from internet """
     url = "https://s3.amazonaws.com/img-datasets/mnist.npz"
@@ -86,12 +106,14 @@ def get_olivetti():
 #%%
 def get_fashion_mnist():
     import tensorflow 
-    X_train, y_train, X_test, y_test = \
+    (X_train, y_train), (X_test, y_test) = \
         tensorflow.keras.datasets.fashion_mnist.load_data()
     return X_train, y_train, X_test, y_test
 
 #%%
 if __name__ == '__main__':
+    devanagari = get_devanagari()
     mnist = get_mnist()
     mnist_distorted = get_mnist_distorted()
     olivetti = get_olivetti()
+    fashion = get_fashion_mnist()
