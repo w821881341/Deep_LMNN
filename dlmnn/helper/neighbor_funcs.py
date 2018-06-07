@@ -26,7 +26,7 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=''):
     Output:
         tN: (N*k) x 2 matrix, with target neighbour index. 
     '''
-    print(50*'-')
+    print(70*'-')
     # Reshape data into 2D
     N = X.shape[0]
     X = np.reshape(X, (N, -1))
@@ -55,7 +55,7 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=''):
             tN_count += n_c
         counter += 1
     print('')
-    print(50*'-')
+    print(70*'-')
     return tN
 
 #%%

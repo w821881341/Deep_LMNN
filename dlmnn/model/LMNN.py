@@ -39,7 +39,7 @@ class lmnn(object):
         self.extractor.add(layer)
     
     #%%    
-    def build(self, k=1, optimizer='adam', learning_rate = 1e-4, 
+    def compile(self, k=1, optimizer='adam', learning_rate = 1e-4, 
               mu=0.5, margin=1):
         """       """
         assert len(self.extractor.layers)!=0, '''Layers must be added with the 
@@ -94,9 +94,8 @@ class lmnn(object):
                 self.extractor_func(self.Xp), [self.Xp])
         
     #%%
-    def fit(self, Xtrain, ytrain, maxEpoch=100, 
-            batch_size=50, val_set=None, run_id=None,
-            verbose=1, snapshot=10):
+    def fit(self, Xtrain, ytrain, maxEpoch=100, batch_size=50, tN=None, 
+            run_id=None, verbose=1, snapshot=10, val_set=None, tN_val=None):
         """
         
         """
@@ -104,13 +103,13 @@ class lmnn(object):
         # Tensorboard file writers
         run_id = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M') if run_id \
                  is None else run_id
-        loc = self.dir_loc + '/' + run_id
+        self.current_loc = self.dir_loc + '/' + run_id
         if not os.path.exists(self.dir_loc): os.makedirs(self.dir_loc)
         if verbose == 2: 
-            self.train_writer = tf.summary.FileWriter(loc + '/train')
+            self.train_writer = tf.summary.FileWriter(self.current_loc + '/train')
             self.train_writer.add_graph(self.session.graph)
             if val_set:
-                self.val_writer = tf.summary.FileWriter(loc + '/val')
+                self.val_writer = tf.summary.FileWriter(self.current_loc + '/val')
         
         # Check for validation set
         validation = False
@@ -123,7 +122,7 @@ class lmnn(object):
         ytrain = ytrain.astype('int32')
         N_train = Xtrain.shape[0]
         n_batch_train = int(np.ceil(N_train / batch_size))
-        print(50*'-')
+        print(70*'-')
         print('Number of training samples:    ', N_train)
         if validation:
             Xval = Xval.astype('float32')
@@ -131,11 +130,12 @@ class lmnn(object):
             N_val = Xval.shape[0]
             n_batch_val = int(np.ceil(N_val / batch_size))
             print('Number of validation samples:  ', N_val)
-        print(50*'-')
+        print(70*'-')
         
         # Target neighbours
-        tN = findTargetNeighbours(Xtrain, ytrain, self.k, name='Training')
-        if validation:
+        if tN is None:
+            tN = findTargetNeighbours(Xtrain, ytrain, self.k, name='Training')
+        if validation and tN_val is None:
             tN_val = findTargetNeighbours(Xval, yval, self.k, name='Validation')
     
         # Training loop
@@ -179,10 +179,8 @@ class lmnn(object):
                     feed_dict = self._get_feed_dict(self.k*batch_size*b, 
                                                     self.k*batch_size*(b+1),
                                                     Xval, yval, tN_val)
-                    loss_out, ntup_out = self.session.run([self._LMNN_loss, self._n_tup], 
-                                                          feed_dict=feed_dict)
+                    loss_out= self.session.run(self._LMNN_loss, feed_dict=feed_dict)
                     stats.add_stat('loss_val', loss_out)
-                    stats.add_stat('#imp_val', ntup_out)
                 
                 # Compute accuracy
                 acc = self.evaluate(Xval, yval, Xtrain, ytrain, batch_size=batch_size)
@@ -192,12 +190,10 @@ class lmnn(object):
                     # Write stats to summary protocol buffer
                     summ = tf.Summary(value=[
                         tf.Summary.Value(tag='Loss', simple_value=np.mean(stats.get_stat('loss_val'))),
-                        tf.Summary.Value(tag='NumberOfImposters', simple_value=np.mean(stats.get_stat('#imp_val'))),
                         tf.Summary.Value(tag='Accuracy', simple_value=np.mean(stats.get_stat('acc_val')))])
              
                     # Save to tensorboard
                     self.val_writer.add_summary(summ, global_step=n_batch_train*e)
-            
             
             stats.on_epoch_end() # End epoch
             
@@ -211,7 +207,7 @@ class lmnn(object):
         
         # Save variables and training stats
         self.save_weights(run_id + '/trained_metric')
-        stats.save(loc + '/training_stats')
+        stats.save(self.current_loc + '/training_stats')
         return stats
                 
                 
@@ -277,9 +273,20 @@ class lmnn(object):
         saver.save(self.session, self.dir_loc+'/'+filename, global_step = step)
     
     #%%
-    def save_embeddings(self, data, direc, imgs=None, labels=None):
+    def save_embeddings(self, data, direc=None, labels=None):
+        """ Embed some data with the current network, and save these to
+            tensorboard for vizualization
+        Arguments:
+            data: data to embed, shape must be equal to model.input_shape
+            direc: directory to save data to
+            labels: if data has labels, supply these for vizualization
+        
+        """
+        self._assert_if_build()
+        direc = self.current_loc if direc is None else '.'
         embeddings = self.transform(data)
-        embedding_projector(embeddings, self.dir_loc+'/'+direc,
+        imgs = data if (data.ndim==4 and (data.shape[-1]==1 or data.shape[-1]==3)) else None
+        embedding_projector(embeddings, direc, name='embedding',
                             imgs=imgs, labels=labels)
     
     #%%
@@ -292,6 +299,9 @@ class lmnn(object):
     #%%
     def summary(self):
         self._assert_if_build()
+        print('Model: lmnn')
+        print('='*65)
+        print('Input shape:               ', self.extractor.input_shape)
         self.extractor.summary()
     
     #%%
@@ -306,22 +316,11 @@ class lmnn(object):
    
     #%%
     def _assert_if_build(self):
-        assert self.built, '''Model is not build, call lmnn.build() 
+        assert self.built, '''Model is not build, call lmnn.compile() 
                 before this function is called '''
     
 #%%
 if __name__ == '__main__':
     # Construct model
-    model = lmnn()
-
-    # Add feature extraction layers
-    model.add(InputLayer(input_shape=(50,)))
-    model.add(Dense(20, use_bias=False, kernel_initializer='identity'))
-    
-    # Build graph
-    #model.build(optimizer='adam', learning_rate=1e-4)
-    
-    # Fit model
-    #model.fit(Xtrain, ytrain)
-    
+    model = lmnn()   
     

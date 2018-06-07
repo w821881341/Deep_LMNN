@@ -43,7 +43,7 @@ def embedding_projector(np_tensor, folder, name='embedding', imgs=None, labels=N
             embeddings can be colored
     """
     tf_tensor = tf.cast(np_tensor, tf.float32)
-    embedding_var = tf.Variable(tf_tensor, name=name)
+    embedding_var = tf.Variable(tf_tensor, name=name, trainable=False)
     with tf.Session() as sess: 
         sess.run(tf.global_variables_initializer()) 
         saver = tf.train.Saver([embedding_var]) 
