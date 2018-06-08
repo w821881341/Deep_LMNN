@@ -12,7 +12,7 @@ from tensorflow.python.keras.layers import Conv2D, MaxPool2D, Dense, InputLayer,
 from tensorflow.python.keras.utils import to_categorical
 
 from dlmnn.model.LMNN import lmnn
-from dlmnn.data.get_img_data import get_mnist
+from dlmnn.data.get_img_data import get_mnist, get_devanagari
 from dlmnn.helper.embeddings import embedding_projector
 from dlmnn.helper.utility import create_dir
 
@@ -31,7 +31,8 @@ if __name__ == '__main__':
     mtype = argparser()
     
     # Get some data
-    X_train, y_train, X_test, y_test = get_mnist()
+    X_train, y_train, X_test, y_test = get_devanagari()
+    input_shape=(32, 32, 1)
     
     # Construct and train normal conv net
     if mtype == 'conv':
@@ -45,7 +46,7 @@ if __name__ == '__main__':
         
         # Create model
         model = Sequential()
-        model.add(InputLayer(input_shape=(28, 28 , 1)))
+        model.add(InputLayer(input_shape=input_shape))
         model.add(Conv2D(16, kernel_size=(3,3), activation='relu', padding='same'))
         model.add(Conv2D(32, kernel_size=(3,3), activation='relu', padding='same'))
         model.add(MaxPool2D(pool_size=(2,2)))
@@ -70,7 +71,7 @@ if __name__ == '__main__':
     # Construct and train lmnn net
     elif mtype == 'lmnn':
         model = lmnn()
-        model.add(InputLayer(input_shape=(28, 28, 1)))
+        model.add(InputLayer(input_shape=input_shape))
         model.add(Conv2D(16, kernel_size=(3,3), activation='relu', padding='same'))
         model.add(Conv2D(32, kernel_size=(3,3), activation='relu', padding='same'))
         model.add(MaxPool2D(pool_size=(2,2)))
@@ -87,7 +88,7 @@ if __name__ == '__main__':
     elif mtype == 'lmnn_redo':
         from dlmnn.helper.neighbor_funcs import findTargetNeighbours
         model = lmnn()
-        model.add(InputLayer(input_shape=(28, 28, 1)))
+        model.add(InputLayer(input_shape=input_shape))
         model.add(Conv2D(16, kernel_size=(3,3), activation='relu', padding='same'))
         model.add(Conv2D(32, kernel_size=(3,3), activation='relu', padding='same'))
         model.add(MaxPool2D(pool_size=(2,2)))
@@ -97,11 +98,11 @@ if __name__ == '__main__':
                       mu=0.5, margin=1)
         
         tN, tN_val = None, None
-        for it in range(5):
+        for it in range(2):
             model.fit(X_train, y_train, 
-                      maxEpoch=10, batch_size=100,
+                      maxEpoch=50, batch_size=200,
                       val_set=[X_test, y_test], snapshot=5,
-                      verbose=1,
+                      verbose=2,
                       tN = tN, tN_val = tN_val)
             X_train_trans = model.transform(X_train)
             X_test_trans = model.transform(X_test)

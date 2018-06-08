@@ -172,7 +172,7 @@ class lmnn(object):
                 stats.on_batch_end() # End batch
                        
             # Evaluation of validation data
-            if validation and (e % snapshot == 0 or e == maxEpoch-1):
+            if validation and ((e+1) % snapshot == 0 or (e+1) == maxEpoch):
                 # Evaluate loss and tuples on val data
                 tN_val = np.random.permutation(tN_val)
                 for b in range(n_batch_val):

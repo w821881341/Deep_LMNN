@@ -12,27 +12,9 @@ from dlmnn.helper.utility import create_dir as _create_dir
 import os as _os
 import numpy as _np
 import urllib as _urllib
+import tarfile as _tarfile
+import pickle as _pickle
 
-#%%
-def get_devanagari():
-    url1 = 'https://raw.githubusercontent.com/sknepal/DHDD_CSV/master/train.csv'
-    url2 = 'https://raw.githubusercontent.com/sknepal/DHDD_CSV/master/test.csv'
-    direc = _get_dir(__file__)
-    _create_dir(direc+'/data_files')
-    for url in [url1, url2]:
-        file_name = 'devanagari_'+url.split('/')[-1]
-        if not _os.path.isfile(direc+'/data_files/'+file_name):
-            print('Downloading the ' + file_name + ' dataset')
-            _urllib.request.urlretrieve(url, direc+'/data_files/'+file_name)
-    
-    train = _np.genfromtxt(direc+'/data_files/'+'devanagari_train.csv', delimiter=',')
-    test = _np.genfromtxt(direc+'/data_files/'+'devanagari_test.csv', delimiter=',')
-    X_train = _np.reshape(train[:,1:], (-1, 32, 32, 1))
-    X_test = _np.reshape(test[:,1:], (-1, 32, 32, 1))
-    y_train = _np.reshape(train[:,0], (-1, ))
-    y_test = _np.reshape(test[:,0], (-1, ))
-    return X_train, y_train, X_test, y_test     
-    
 #%%
 def get_mnist():
     """ Downloads mnist from internet """
@@ -70,6 +52,33 @@ def get_mnist_distorted():
     return X_train, y_train, X_test, y_test
 
 #%%
+def get_mnist_fashion():
+    import tensorflow 
+    (X_train, y_train), (X_test, y_test) = \
+        tensorflow.keras.datasets.fashion_mnist.load_data()
+    return X_train, y_train, X_test, y_test
+
+#%%
+def get_devanagari():
+    url1 = 'https://raw.githubusercontent.com/sknepal/DHDD_CSV/master/train.csv'
+    url2 = 'https://raw.githubusercontent.com/sknepal/DHDD_CSV/master/test.csv'
+    direc = _get_dir(__file__)
+    _create_dir(direc+'/data_files')
+    for url in [url1, url2]:
+        file_name = 'devanagari_'+url.split('/')[-1]
+        if not _os.path.isfile(direc+'/data_files/'+file_name):
+            print('Downloading the ' + file_name + ' dataset')
+            _urllib.request.urlretrieve(url, direc+'/data_files/'+file_name)
+    
+    train = _np.genfromtxt(direc+'/data_files/'+'devanagari_train.csv', delimiter=',')
+    test = _np.genfromtxt(direc+'/data_files/'+'devanagari_test.csv', delimiter=',')
+    X_train = _np.reshape(train[:,1:], (-1, 32, 32, 1))
+    X_test = _np.reshape(test[:,1:], (-1, 32, 32, 1))
+    y_train = _np.reshape(train[:,0], (-1, ))
+    y_test = _np.reshape(test[:,0], (-1, ))
+    return X_train, y_train, X_test, y_test     
+
+#%%
 def get_olivetti():
     from sklearn.datasets import fetch_olivetti_faces
     direc = _get_dir(__file__)
@@ -104,16 +113,90 @@ def get_olivetti():
     return X_train, y_train, X_test, y_test
 
 #%%
-def get_fashion_mnist():
-    import tensorflow 
-    (X_train, y_train), (X_test, y_test) = \
-        tensorflow.keras.datasets.fashion_mnist.load_data()
+def get_cifar10():
+    url='https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+    direc = _get_dir(__file__)
+    _create_dir(direc+'/data_files')
+    file_name = url.split('/')[-1]
+    if not _os.path.isfile(direc+'/data_files/'+file_name):
+        print('Downloading the cifar10 dataset (163MB)')
+        _urllib.request.urlretrieve(url, direc+'/data_files/'+file_name)
+    
+    # Unzip data
+    with _tarfile.open(direc+'/data_files/'+file_name, 'r:gz') as t:
+        t.extractall(path=direc+'/data_files/')
+    
+    # Extract data
+    X_train = _np.zeros((50000, 3072), dtype=_np.uint8)
+    y_train = _np.zeros((50000, ), dtype=_np.int64)
+    for i in range(1,6):
+        with open(direc+'/data_files/cifar-10-batches-py/data_batch_'+str(i), 'rb') as fo:
+            data = _pickle.load(fo, encoding='bytes')
+        X_train[10000*(i-1):10000*i] = _np.array(data[b'data'])
+        y_train[10000*(i-1):10000*i] = _np.array(data[b'labels'])
+        
+    with open(direc+'/data_files/cifar-10-batches-py/test_batch', 'rb') as fo:
+        data = _pickle.load(fo, encoding='bytes')
+    X_test = _np.array(data[b'data'])
+    y_test = _np.array(data[b'labels'])
+    
+    # Reshape to image format
+    X_train = _np.transpose(_np.reshape(X_train, (50000, 3, 32, 32)), axes=[0,2,3,1])
+    X_test = _np.transpose(_np.reshape(X_test, (10000, 3, 32, 32)), axes=[0,2,3,1]) 
+    
     return X_train, y_train, X_test, y_test
 
+#%%    
+def get_cifar100():
+    url='https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz'
+    direc = _get_dir(__file__)
+    _create_dir(direc+'/data_files')
+    file_name = url.split('/')[-1]
+    if not _os.path.isfile(direc+'/data_files/'+file_name):
+        print('Downloading the cifar100 dataset (161MB)')
+        _urllib.request.urlretrieve(url, direc+'/data_files/'+file_name)
+    
+    # Unzip data
+    with _tarfile.open(direc+'/data_files/'+file_name, 'r:gz') as t:
+        t.extractall(path=direc+'/data_files/')
+    
+    # Extract data
+
+    with open(direc+'/data_files/cifar-100-python/train', 'rb') as fo:
+        data = _pickle.load(fo, encoding='bytes')        
+        X_train = _np.array(data[b'data'])
+        y_train = _np.array(data[b'fine_labels'])
+        
+    with open(direc+'/data_files/cifar-100-python/test', 'rb') as fo:
+        data = _pickle.load(fo, encoding='bytes')        
+        X_test = _np.array(data[b'data'])
+        y_test = _np.array(data[b'fine_labels'])
+            
+    # Reshape to image format
+    X_train = _np.transpose(_np.reshape(X_train, (50000, 3, 32, 32)), axes=[0,2,3,1])
+    X_test = _np.transpose(_np.reshape(X_test, (10000, 3, 32, 32)), axes=[0,2,3,1]) 
+    
+    return X_train, y_train, X_test, y_test
+    
 #%%
-if __name__ == '__main__':
-    devanagari = get_devanagari()
+def get_dataset(name='mnist'):
+    datasets = {'mnist': get_mnist,
+                'mnist_distorted': get_mnist_distorted,
+                'mnist_fashion': get_mnist_fashion,
+                'devanagari': get_devanagari,
+                'olivetti': get_olivetti,
+                'cifar10': get_cifar10,
+                'cifar100': get_cifar100}
+    assert (name in datasets), 'Unknown dataset, choose between: ' \
+            + ', '.join([k for k in datasets.keys()])
+    return datasets[name]()
+
+#%%
+if __name__ == '__main__':    
     mnist = get_mnist()
     mnist_distorted = get_mnist_distorted()
+    fashion = get_mnist_fashion()
+    devanagari = get_devanagari()
     olivetti = get_olivetti()
-    fashion = get_fashion_mnist()
+    cifar10 = get_cifar10()
+    cifar100 = get_cifar100()
