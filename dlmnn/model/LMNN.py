@@ -92,7 +92,12 @@ class lmnn(object):
         # Create callable functions
         self.transformer = self.session.make_callable(
                 self.extractor_func(self.Xp), [self.Xp])
-        
+    #%%
+    def reintialize(self):
+        self._assert_if_build()
+        init = tf.global_variables_initializer()
+        self.session.run(init)
+    
     #%%
     def fit(self, Xtrain, ytrain, maxEpoch=100, batch_size=50, tN=None, 
             run_id=None, verbose=1, snapshot=10, val_set=None, tN_val=None):

@@ -20,7 +20,7 @@ from dlmnn.model.LMNN import lmnn
 from dlmnn.data.get_img_data import get_dataset
 from dlmnn.helper.embeddings import embedding_projector
 from dlmnn.helper.utility import create_dir
-from dlmnn.helper.neighbor_funcs import knnClassifier
+from dlmnn.helper.neighbor_funcs import knnClassifier, findTargetNeighbours
 
 #%%
 def argparser( ):
@@ -28,22 +28,37 @@ def argparser( ):
     parser = argparse.ArgumentParser(description='''Something''') 
     parser.add_argument('-d', action="store", dest='dataset', type=str, 
                         default='mnist', help='''Dataset to use''')
+    parser.add_argument('-k', action="store", dest='k', type=int,
+                        default=1, help='''Number of neighbours''')
+    parser.add_argument('-e', action="store", dest='e', type=int,
+                        default=10, help='''Number of epochs''')
+    parser.add_argument('-n', action="store", dest='n', type=str,
+                        default='res', help='''where to store final results''')
     args = parser.parse_args() 
     args = vars(args) 
-    return args['dataset']
+    return args
 
 #%%
 if __name__ == '__main__':
-    performance = np.zeros((4, ), dtype=np.float32)
-    pred1, pred2, pred3, pred4 = [ ], [ ], [ ], [ ]
+    # Allocate array for results
+    performance = np.zeros((5, ), dtype=np.float32)
+    pred1, pred2, pred3, pred4, pred5 = [ ], [ ], [ ], [ ], [ ]
     
+    # Get input arguments
+    args = argparser()
+    dataset = args['dataset']
+    k = args['k']
+    maxEpochs = args['e']
+    name = args['n']
     
-    dataset = argparser()
+    # Get data
     X_train, y_train, X_test, y_test = get_dataset(dataset)
     input_shape = X_train.shape[1:]
     n_class = len(np.unique(y_train))
-    maxEpochs = [50, 100]
-    k = 1
+    
+    print(70*'=')
+    print(dataset)
+    print(70*'=')
     
     ############################## MODEL 1 ################################
     ############################## KNN classifier #########################
@@ -76,7 +91,7 @@ if __name__ == '__main__':
     
     # Fit model
     model.fit(X_train, to_categorical(y_train, n_class), 
-              epochs=maxEpochs[0], callbacks=[cb], batch_size=200,
+              epochs=maxEpochs, callbacks=[cb], batch_size=200,
               validation_data=(X_test, to_categorical(y_test, n_class)))
     
     # Evaluate model
@@ -136,7 +151,7 @@ if __name__ == '__main__':
     
     # Fit model
     model.fit(X_train, y_train, 
-              maxEpoch=maxEpochs[1], batch_size=200,
+              maxEpoch=maxEpochs, batch_size=200,
               val_set=[X_test, y_test], snapshot=5,
               verbose=2)
     
@@ -150,6 +165,42 @@ if __name__ == '__main__':
     # Save results
     pred4.append(pred)
     performance[3] = acc
-        
+    
+    ############################## MODEL 5 ################################
+    ############################## Deep lmnn with recomputed tN ###########
+    model.reintialize()
+    
+    # Fit model ones
+    model.fit(X_train, y_train, 
+              maxEpoch=int(np.round(maxEpochs/2)), batch_size=200,
+              val_set=[X_test, y_test], snapshot=5,
+              verbose=2)
+    
+    # Recompute target neighbours
+    X_train_trans = model.transform(X_train)
+    X_test_trans = model.transform(X_test)
+    tN = findTargetNeighbours(X_train_trans, y_train, k=k)
+    tN_val = findTargetNeighbours(X_test_trans, y_test, k=k)
+    
+    # Fit model second time
+    model.fit(X_train, y_train, 
+              maxEpoch=int(np.round(maxEpochs/2)), batch_size=200,
+              val_set=[X_test, y_test], snapshot=5,
+              verbose=2,
+              tN = tN, tN_val=tN_val)
+    
+    # Save embeddings
+    model.save_embeddings(X_test, labels=y_test)
+    
+    # Evaluate model
+    acc = model.evaluate(X_test, y_test, X_train, y_train)
+    pred = model.predict(X_test, X_train, y_train)
+    
+    # Save results
+    pred5.append(pred)
+    performance[4] = acc
+
+    ############################## Save res ################################    
+    create_dir(name)
     np.save('performance_' + dataset, performance)
     np.save('predictions_' + dataset, [pred1, pred2, pred3, pred4])
