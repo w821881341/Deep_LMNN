@@ -57,7 +57,7 @@ def embedding_projector(np_tensor, folder, name='embedding', imgs=None, labels=N
     if imgs is not None:
         s, h, w, nc = create_sprite(imgs)
         s = s[:,:,0] if nc == 1 else s
-        plt.imsave(folder + '/'+name+'_sprite.png', s, cmap='gray' if nc==1 else 'color')
+        plt.imsave(folder + '/'+name+'_sprite.png', s, cmap='gray' if nc==1 else None)
         embedding.sprite.image_path = name+'_sprite.png'
         embedding.sprite.single_image_dim.extend([w, h])
     

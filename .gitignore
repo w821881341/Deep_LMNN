@@ -3,3 +3,5 @@ __pycache__
 dlmnn/data/data_files
 dlmnn/logs
 dlmnn/helper/embedding_example
+performance_*
+predictions_*

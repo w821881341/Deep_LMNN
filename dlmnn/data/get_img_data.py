@@ -49,6 +49,8 @@ def get_mnist_distorted():
     X_test, y_test = data['x_test'], data['y_test']
     X_train = _np.reshape(X_train, (X_train.shape[0], 60, 60, 1))
     X_test = _np.reshape(X_test, (X_test.shape[0], 60, 60, 1))
+    y_train = _np.argmax(y_train, axis=1)
+    y_test = _np.argmax(y_test, axis=1)
     return X_train, y_train, X_test, y_test
 
 #%%
@@ -56,6 +58,8 @@ def get_mnist_fashion():
     import tensorflow 
     (X_train, y_train), (X_test, y_test) = \
         tensorflow.keras.datasets.fashion_mnist.load_data()
+    X_train = _np.reshape(X_train, (-1, 28, 28, 1))
+    X_test = _np.reshape(X_test, (-1, 28, 28, 1))
     return X_train, y_train, X_test, y_test
 
 #%%
