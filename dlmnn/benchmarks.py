@@ -42,7 +42,7 @@ if __name__ == '__main__':
     X_train, y_train, X_test, y_test = get_dataset(dataset)
     input_shape = X_train.shape[1:]
     n_class = len(np.unique(y_train))
-    maxEpochs = 50
+    maxEpochs = [50, 100]
     k = 1
     
     ############################## MODEL 1 ################################
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     
     # Fit model
     model.fit(X_train, to_categorical(y_train, n_class), 
-              epochs=maxEpochs, callbacks=[cb], batch_size=200,
+              epochs=maxEpochs[0], callbacks=[cb], batch_size=200,
               validation_data=(X_test, to_categorical(y_test, n_class)))
     
     # Evaluate model
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     
     # Fit model
     model.fit(X_train, y_train, 
-              maxEpoch=maxEpochs, batch_size=200,
+              maxEpoch=maxEpochs[1], batch_size=200,
               val_set=[X_test, y_test], snapshot=5,
               verbose=2)
     
