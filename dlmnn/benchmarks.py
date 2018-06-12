@@ -202,5 +202,5 @@ if __name__ == '__main__':
 
     ############################## Save res ################################    
     create_dir(name)
-    np.save('performance_' + dataset, performance)
-    np.save('predictions_' + dataset, [pred1, pred2, pred3, pred4])
+    np.save(name+'/performance_' + dataset, performance)
+    np.save(name+'/predictions_' + dataset, [pred1, pred2, pred3, pred4])

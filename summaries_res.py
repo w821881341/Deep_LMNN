@@ -21,13 +21,25 @@ def load_res(folder):
             results[name] = np.round(res, 3)
     
     return results
+
+def argparser():
+    import argparse 
+    parser = argparse.ArgumentParser(description='''Something''') 
+    parser.add_argument('-n', action="store", dest='n', type=str,
+                        default='res', help='''where to store final results''')
+    args = parser.parse_args() 
+    args = vars(args) 
+    return args['n']
+
 #%%
 if __name__ == '__main__':
-    folder='dlmnn'
+    folder=argparser
     results = load_res(folder)
     
-    t = PrettyTable(['Dataset', 'KNN', 'CONV', 'CONV-KNN', 'LMNN'])
+    t = PrettyTable(['Dataset', 'KNN', 'CONV', 'CONV-KNN', 'LMNN', 'LMNN-Redo'])
     for key, value in results.items():
         t.add_row([key, *value])
+    t.align = 'l'
+    t.set_style(float_format='0.3')
     print(t)
     
