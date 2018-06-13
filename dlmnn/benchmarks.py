@@ -32,6 +32,10 @@ def argparser( ):
                         default=1, help='''Number of neighbours''')
     parser.add_argument('-e', action="store", dest='e', type=int,
                         default=10, help='''Number of epochs''')
+    parser.add_argument('-m', action="store", dest='m', type=float,
+                        default=1.0, help='''margin''')
+    parser.add_argument('-mu', action="store", dest='mu', type=float,
+                        default=0.5, help='''mu''')
     parser.add_argument('-n', action="store", dest='n', type=str,
                         default='res', help='''where to store final results''')
     args = parser.parse_args() 
@@ -50,6 +54,8 @@ if __name__ == '__main__':
     k = args['k']
     maxEpochs = args['e']
     name = args['n']
+    margin = args['m']
+    mu = args['mu']
     
     # Get data
     X_train, y_train, X_test, y_test = get_dataset(dataset)
@@ -147,7 +153,7 @@ if __name__ == '__main__':
     model.add(Flatten())
     model.add(Dense(128, activation='relu'))
     model.compile(k=k, optimizer='adam', learning_rate=1e-4, 
-                  mu=0.5, margin=1)
+                  mu=mu, margin=margin)
     
     # Fit model
     model.fit(X_train, y_train, 
