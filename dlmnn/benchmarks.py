@@ -34,7 +34,7 @@ def argparser( ):
                         default=10, help='''Number of epochs''')
     parser.add_argument('-m', action="store", dest='m', type=float,
                         default=1.0, help='''margin''')
-    parser.add_argument('-mu', action="store", dest='mu', type=float,
+    parser.add_argument('-w', action="store", dest='w', type=float,
                         default=0.5, help='''mu''')
     parser.add_argument('-n', action="store", dest='n', type=str,
                         default='res', help='''where to store final results''')
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     maxEpochs = args['e']
     name = args['n']
     margin = args['m']
-    mu = args['mu']
+    mu = args['w']
     
     # Get data
     X_train, y_train, X_test, y_test = get_dataset(dataset)

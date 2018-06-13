@@ -17,7 +17,7 @@ def argparser( ):
                         default=10, help='''epochs''')
     parser.add_argument('-m', action="store", dest='m', type=float,
                         default=1.0, help='''margin''')
-    parser.add_argument('-mu', action="store", dest='mu', type=float,
+    parser.add_argument('-w', action="store", dest='w', type=float,
                         default=0.5, help='''mu''')
     parser.add_argument('-n', action="store", dest='n', type=str,
                         default='res', help='''where to store final results''')
@@ -33,13 +33,13 @@ if __name__ == '__main__':
     e = '-e ' + str(args['e']) + ' '
     n = '-n ' + args['n'] + ' '
     m = '-m ' + str(args['m']) + ' '
-    mu = '-mu' + str(args['mu']) + ' '
+    w = '-w' + str(args['w']) + ' '
     
     # Run benchmarks
-    os.system("python dlmnn/benchmarks.py "+k+e+n+m+mu+"-d mnist")
-    os.system("python dlmnn/benchmarks.py "+k+e+n+m+mu+"-d mnist_distorted")
-    os.system("python dlmnn/benchmarks.py "+k+e+n+m+mu+"-d mnist_fashion")
-    os.system("python dlmnn/benchmarks.py "+k+e+n+m+mu+"-d devanagari")
-    os.system("python dlmnn/benchmarks.py "+k+e+n+m+mu+"-d olivetti")
-    os.system("python dlmnn/benchmarks.py "+k+e+n+m+mu+"-d cifar10")
-    os.system("python dlmnn/benchmarks.py "+k+e+n+m+mu+"-d cifar100")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+m+w+"-d mnist")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+m+w+"-d mnist_distorted")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+m+w+"-d mnist_fashion")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+m+w+"-d devanagari")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+m+w+"-d olivetti")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+m+w+"-d cifar10")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+m+w+"-d cifar100")
