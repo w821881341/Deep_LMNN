@@ -83,6 +83,8 @@ class lmnn(object):
         tf.summary.histogram('Rel_push_dist', D_3 / (D_2 + margin))
         tf.summary.scalar('True_imp', tf.reduce_sum(true_imp))
         tf.summary.scalar('Frac_true_imp', tf.reduce_mean(true_imp))
+        tf.summary.scalar('Sparsity', tf.reduce_mean(tf.reduce_sum(
+                tf.tanh(tf.pow(self.extractor_func(self.Xp), 2.0)), axis=1)))
         self._summary = tf.summary.merge_all()
                
         # Initilize session

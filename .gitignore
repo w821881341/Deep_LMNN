@@ -1,7 +1,7 @@
 .spyproject
 __pycache__
 dlmnn/data/data_files
-dlmnn/logs
+logs
 dlmnn/helper/embedding_example
 performance_*
 predictions_*
