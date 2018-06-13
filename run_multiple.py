@@ -30,10 +30,10 @@ if __name__ == '__main__':
     n = '-n ' + args['n'] + ' '
     
     # Run benchmarks
-    os.system("python benchmarks.py "+k+e+n+"-d mnist")
-    os.system("python benchmarks.py "+k+e+n+"-d mnist_distorted")
-    os.system("python benchmarks.py "+k+e+n+"-d mnist_fashion")
-    os.system("python benchmarks.py "+k+e+n+"-d devanagari")
-    os.system("python benchmarks.py "+k+e+n+"-d olivetti")
-    os.system("python benchmarks.py "+k+e+n+"-d cifar10")
-    os.system("python benchmarks.py "+k+e+n+"-d cifar100")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+"-d mnist")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+"-d mnist_distorted")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+"-d mnist_fashion")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+"-d devanagari")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+"-d olivetti")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+"-d cifar10")
+    os.system("python dlmnn/benchmarks.py "+k+e+n+"-d cifar100")

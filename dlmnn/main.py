@@ -57,7 +57,7 @@ if __name__ == '__main__':
                       loss='categorical_crossentropy', 
                       metrics=['accuracy'])
         model.fit(X_train, to_categorical(y_train, 10), 
-                  epochs=50, callbacks=[cb],
+                  epochs=1, callbacks=[cb],
                   validation_data=(X_test, to_categorical(y_test, 10)))
         
         # Save model
@@ -80,7 +80,7 @@ if __name__ == '__main__':
         model.compile(k=3, optimizer='adam', learning_rate=1e-4, 
                       mu=0.5, margin=1)
         model.fit(X_train, y_train, 
-                  maxEpoch=50, batch_size=100,
+                  maxEpoch=1, batch_size=100,
                   val_set=[X_test, y_test], snapshot=5,
                   verbose=2)
         model.save_embeddings(X_test, labels=y_test)
