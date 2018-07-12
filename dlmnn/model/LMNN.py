@@ -10,6 +10,7 @@ Created on Thu May 31 10:11:15 2018
 from dlmnn.helper.neighbor_funcs import findTargetNeighbours, knnClassifier
 from dlmnn.helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters
 from dlmnn.helper.tf_funcs import tf_LMNN_loss, tf_featureExtractor
+from dlmnn.helper.layers import L2normalize
 from dlmnn.helper.logger import stat_logger
 from dlmnn.helper.utility import get_optimizer
 from dlmnn.helper.embeddings import embedding_projector
@@ -26,6 +27,7 @@ class lmnn(object):
         # Initilize session and tensorboard dirs 
         self.session = tf.Session() if session is None else session
         self.dir_loc = './logs' if dir_loc is None else dir_loc
+        self._writer = None
         
         # Initialize feature extractor
         self.extractor = Sequential()
@@ -40,15 +42,18 @@ class lmnn(object):
     
     #%%    
     def compile(self, k=1, optimizer='adam', learning_rate = 1e-4, 
-              mu=0.5, margin=1):
-        """       """
+              mu=0.5, margin=1, normalize=False):
+        """ Builds the tensorflow graph that is evaluated in the fit method """
         assert len(self.extractor.layers)!=0, '''Layers must be added with the 
                 lmnn.add() method before this function is called '''
         self.built = True
         
         # Set number of neighbours
         self.k = k        
-        
+
+        # Normalize extracted features if asked for
+        if normalize: self.extractor.add(L2normalize())
+
         # Shapes
         self.input_shape = self.extractor.input_shape
         self.output_shape = self.extractor.output_shape
@@ -66,7 +71,7 @@ class lmnn(object):
         # Build graph
         D = self.dist_func(self.Xp, self.Xp)
         tup = tf_findImposters(D, self.yp, self.tNp, margin=margin)
-        self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=1)
+        self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=margin)
         
         # Construct training operation
         self.optimizer = get_optimizer(optimizer)(learning_rate=learning_rate)
@@ -76,15 +81,17 @@ class lmnn(object):
         # Summaries
         self._n_tup = tf.shape(tup)[0]
         true_imp = tf.cast(tf.less(D_3, D_2), tf.float32)
+        features = self.extractor_func(self.Xp)
         tf.summary.scalar('Loss', self._LMNN_loss) 
         tf.summary.scalar('Num_imp', self._n_tup)
         tf.summary.scalar('Loss_pull', tf.reduce_sum(D_1))
         tf.summary.scalar('Loss_push', tf.reduce_sum(margin + D_2 - D_3))
-        tf.summary.histogram('Rel_push_dist', D_3 / (D_2 + margin))
         tf.summary.scalar('True_imp', tf.reduce_sum(true_imp))
         tf.summary.scalar('Frac_true_imp', tf.reduce_mean(true_imp))
-        tf.summary.scalar('Sparsity', tf.reduce_mean(tf.reduce_sum(
-                tf.tanh(tf.pow(self.extractor_func(self.Xp), 2.0)), axis=1)))
+        tf.summary.scalar('Sparsity_tanh', tf.reduce_mean(tf.reduce_sum(
+                tf.tanh(tf.pow(features, 2.0)), axis=1)))
+        tf.summary.scalar('Sparsity_l0', tf.reduce_mean(tf.reduce_sum(
+                tf.cast(tf.equal(features, 0), tf.int32), axis=1)))
         self._summary = tf.summary.merge_all()
                
         # Initilize session
@@ -92,8 +99,11 @@ class lmnn(object):
         self.session.run(init)
         
         # Create callable functions
-        self.transformer = self.session.make_callable(
+        self._transformer = self.session.make_callable(
                 self.extractor_func(self.Xp), [self.Xp])
+        self._distances = self.session.make_callable(
+                self.dist_func(self.Xp, self.Xp), [self.Xp])
+        
     #%%
     def reintialize(self):
         self._assert_if_build()
@@ -113,10 +123,8 @@ class lmnn(object):
         self.current_loc = self.dir_loc + '/' + run_id
         if not os.path.exists(self.dir_loc): os.makedirs(self.dir_loc)
         if verbose == 2: 
-            self.train_writer = tf.summary.FileWriter(self.current_loc + '/train')
-            self.train_writer.add_graph(self.session.graph)
-            if val_set:
-                self.val_writer = tf.summary.FileWriter(self.current_loc + '/val')
+            self._writer = tf.summary.FileWriter(self.current_loc)
+            self._writer.add_graph(self.session.graph)
         
         # Check for validation set
         validation = False
@@ -175,10 +183,10 @@ class lmnn(object):
                 
                 # Save to tensorboard
                 if verbose==2: 
-                    self.train_writer.add_summary(summ, global_step=b+n_batch_train*e)
+                    self._writer.add_summary(summ, global_step=b+n_batch_train*e)
                 stats.on_batch_end() # End batch
                        
-            # Evaluation of validation data
+            # If we are at an snapshot epoch and are doing validation
             if validation and ((e+1) % snapshot == 0 or (e+1) == maxEpoch or e==0):
                 # Evaluate loss and tuples on val data
                 tN_val = np.random.permutation(tN_val)
@@ -196,12 +204,12 @@ class lmnn(object):
                 if verbose==2:
                     # Write stats to summary protocol buffer
                     summ = tf.Summary(value=[
-                        tf.Summary.Value(tag='Loss', simple_value=np.mean(stats.get_stat('loss_val'))),
-                        tf.Summary.Value(tag='Accuracy', simple_value=np.mean(stats.get_stat('acc_val')))])
+                        tf.Summary.Value(tag='Loss_val', simple_value=np.mean(stats.get_stat('loss_val'))),
+                        tf.Summary.Value(tag='Accuracy_val', simple_value=np.mean(stats.get_stat('acc_val')))])
              
                     # Save to tensorboard
-                    self.val_writer.add_summary(summ, global_step=n_batch_train*e)
-            
+                    self._writer.add_summary(summ, global_step=n_batch_train*e)
+                           
             stats.on_epoch_end() # End epoch
             
             # Check if we should terminate
@@ -236,7 +244,7 @@ class lmnn(object):
         # Transform data in batches
         for b in range(n_batch):
             X_batch = X[batch_size*b:batch_size*(b+1)]
-            X_trans[batch_size*b:batch_size*(b+1)] = self.transformer(X_batch)
+            X_trans[batch_size*b:batch_size*(b+1)] = self._transformer(X_batch)
         return X_trans
     
     #%%    
@@ -294,7 +302,7 @@ class lmnn(object):
         embeddings = self.transform(data)
         imgs = data if (data.ndim==4 and (data.shape[-1]==1 or data.shape[-1]==3)) else None
         embedding_projector(embeddings, direc, name='embedding',
-                            imgs=imgs, labels=labels)
+                            imgs=imgs, labels=labels, writer=self._writer)
     
     #%%
     def get_weights(self):

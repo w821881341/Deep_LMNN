@@ -18,11 +18,11 @@ class stat_logger(object):
         n_epoch: scalar, number of epochs
         n_batch: scalar, number of batches
         n_move: scalar, number of batches to calculate moving average over
-        verbose: bool, determines if training stats are printed
+        verbose: int, determines if training stats are printed
         terminate_tol: scalar, if difference in moving average is smaller than
                        this, then the process is terminated
     '''
-    def __init__(self, n_epoch, n_batch, verbose=True, 
+    def __init__(self, n_epoch, n_batch, verbose=1, 
                  n_move = 20, terminate_tol = 1e-8):
         self.n_epoch = n_epoch
         self.n_batch = n_batch

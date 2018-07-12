@@ -32,7 +32,8 @@ def write_metadata(filename, labels):
             f.write("%d\t%d\n" % (index,label))
 
 #%%
-def embedding_projector(np_tensor, folder, name='embedding', imgs=None, labels=None):
+def embedding_projector(np_tensor, folder, name='embedding', imgs=None, labels=None,
+                        writer = None):
     """ Tensorboard embedding projector
     Arguments:
         embedding_var: tensorboard variable to embed
@@ -67,7 +68,8 @@ def embedding_projector(np_tensor, folder, name='embedding', imgs=None, labels=N
         embedding.metadata_path = name+'_metadata.tsv'
     
     # Connect summary writer with projector
-    summary_writer = tf.summary.FileWriter(folder, filename_suffix=name)
+    summary_writer = tf.summary.FileWriter(folder, filename_suffix=name)  \
+                        if writer is None else writer
     projector.visualize_embeddings(summary_writer, config)
     
     # Close
