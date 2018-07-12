@@ -35,4 +35,8 @@ import os
 #os.system("python dlmnn/main.py -e 200 -k 5 -m 100")
 #os.system("python dlmnn/main.py -e 200 -k 5 -m 1000")
 #os.system("python dlmnn/main.py -e 200 -k 5 -m 10000")
-os.system("python dlmnn/main.py -e 200 -k 5 -m 0.5") # normalized
+#os.system("python dlmnn/main.py -e 200 -k 5 -m 0.5") # normalized
+
+
+######################### Olivetti
+os.system("python dlmnn/main.py -e 1000 -k 1 -b 280 -m 100 -n")

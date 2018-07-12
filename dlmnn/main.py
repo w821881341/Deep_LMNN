@@ -6,9 +6,7 @@ Created on Wed May 30 12:36:27 2018
 @author: nsde
 """
 #%%
-from tensorflow.python.keras.layers import Conv2D, MaxPool2D, Dense 
-from tensorflow.python.keras.layers import InputLayer, Flatten
-
+from dlmnn.helper.layers import  InputLayer, Flatten, Conv2D, MaxPool2D, Dense 
 from dlmnn.model.LMNN import lmnn
 from dlmnn.data.get_img_data import get_dataset
 
@@ -20,6 +18,8 @@ def argparser( ):
                         default=1, help='''Number of neighbours''')
     parser.add_argument('-e', action="store", dest='e', type=int,
                         default=10, help='''epochs''')
+    parser.add_argument('-b', action="store", dest='b', type=int,
+                        default=100, help='''batch size''')
     parser.add_argument('-m', action="store", dest='m', type=float,
                         default=1.0, help='''margin''')
     parser.add_argument('-w', action="store", dest='w', type=float,
@@ -36,19 +36,20 @@ def argparser( ):
 if __name__ == '__main__':
     # Get input arguments
     args = argparser()
+    print(args)
     
     # Get some data
-    X_train, y_train, X_test, y_test = get_dataset('cifar10')
+    X_train, y_train, X_test, y_test = get_dataset('olivetti')
     input_shape=X_train.shape[1:]
     
     # Make model
     model = lmnn()
     model.add(InputLayer(input_shape=input_shape))
-    model.add(Conv2D(16, kernel_size=(3,3), activation='relu', padding='same'))
-    model.add(Conv2D(32, kernel_size=(3,3), activation='relu', padding='same'))
+    model.add(Conv2D(16, kernel_size=(3,3), activation='linear', padding='same'))
+    model.add(Conv2D(32, kernel_size=(3,3), activation='linear', padding='same'))
     model.add(MaxPool2D(pool_size=(2,2)))
     model.add(Flatten())
-    model.add(Dense(128, activation='relu'))
+    model.add(Dense(128, activation='linear'))
     
     # Compile model
     model.compile(k=args['k'], optimizer='adam', learning_rate=1e-4, 
@@ -58,7 +59,7 @@ if __name__ == '__main__':
     
     # Fit model and save result
     model.fit(X_train, y_train, 
-              maxEpoch=args['e'], batch_size=100,
+              maxEpoch=args['e'], batch_size=args['b'],
               val_set=[X_test, y_test], snapshot=5,
               verbose=2)
     model.save_embeddings(X_test, labels=y_test)
