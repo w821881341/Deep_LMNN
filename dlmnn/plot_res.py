@@ -16,7 +16,7 @@ X_rot = np.dot(X_trans2, u)
 
 fig, ax = plt.subplots(1,7)
 for i in range(6):
-    plot=ax[i].imshow(X_trans1[500*i:500*(i+1)])
+    plot=ax[i].imshow(X_trans1[500*i:500*(i+1)]>0.3)
     ax[i].axis('off')
 ax[6].axis('off')
 fig.colorbar(plot, ax=ax[6])

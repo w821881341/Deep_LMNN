@@ -39,4 +39,4 @@ import os
 
 
 ######################### Olivetti
-os.system("python dlmnn/main.py -e 1000 -k 1 -b 280 -m 100 -n")
+os.system("python dlmnn/main.py -e 200 -k 1 -b 1000 -l 1e-3 -m 0.5 -n 1")
