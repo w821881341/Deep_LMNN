@@ -48,9 +48,9 @@ if __name__ == '__main__':
     # Make model
     model = lmnn()
     model.add(InputLayer(input_shape=input_shape))
-    model.add(Conv2D(16, kernel_size=(3,3), activation='relu', padding='same'))
+    model.add(Conv2D(16, kernel_size=(3,3), padding='same'))
     #model.add(LeakyReLU(alpha=0.3))
-    model.add(Conv2D(32, kernel_size=(3,3), activation='relu', padding='same'))
+    model.add(Conv2D(32, kernel_size=(3,3), padding='same'))
     #model.add(LeakyReLU(alpha=0.3))
     model.add(MaxPool2D(pool_size=(2,2)))
     model.add(Flatten())

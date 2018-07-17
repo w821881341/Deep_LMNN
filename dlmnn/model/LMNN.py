@@ -112,7 +112,7 @@ class lmnn(object):
     
     #%%
     def fit(self, Xtrain, ytrain, maxEpoch=100, batch_size=50, tN=None, 
-            run_id=None, verbose=1, snapshot=10, val_set=None, tN_val=None):
+            run_id=None, verbose=2, snapshot=10, val_set=None, tN_val=None):
         """
         
         """

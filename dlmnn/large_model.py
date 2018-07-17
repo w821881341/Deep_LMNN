@@ -7,7 +7,7 @@ Created on Mon Jul 16 08:54:06 2018
 #%%
 from tensorflow.python.keras.models import Sequential
 from tensorflow.python.keras.layers import Dense, Activation, Flatten, Dropout, BatchNormalization
-from tensorflow.python.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, ELU
 from tensorflow.python.keras import regularizers
 from tensorflow.python.keras.optimizers import RMSprop
 from tensorflow.python.keras import utils
@@ -22,7 +22,7 @@ def argparser( ):
     import argparse 
     parser = argparse.ArgumentParser(description='''Something''') 
     parser.add_argument('-t', action="store", dest='mtype', type=str,
-                        default='conv', help='''model to use''')
+                        default='lmnn', help='''model to use''')
     args = parser.parse_args() 
     args = vars(args) 
     return args
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     x_train, y_train, x_test, y_test = get_dataset('cifar10')
     input_shape=x_train.shape[1:]
     
-    baseMapNum=32
+    baseMapNum = 32
     weight_decay = 1e-4
     num_classes = 10
     
@@ -43,10 +43,12 @@ if __name__ == '__main__':
     std = np.std(x_train,axis=(0,1,2,3))
     x_train = (x_train-mean)/(std+1e-7)
     x_test = (x_test-mean)/(std+1e-7)
-    y_train = utils.to_categorical(y_train,num_classes)
-    y_test = utils.to_categorical(y_test,num_classes)
+
     
     if args['mtype'] == 'conv':
+        y_train = utils.to_categorical(y_train,num_classes)
+        y_test = utils.to_categorical(y_test,num_classes)
+        
         model = Sequential()
         model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay), input_shape=x_train.shape[1:]))
         model.add(Activation('relu'))
@@ -88,13 +90,15 @@ if __name__ == '__main__':
                   validation_data = [x_test, y_test])
         
     elif args['mtype'] == 'lmnn':
+         tN, tN_val=np.load('targetNeighbours.npy')
+        
          model = lmnn()
          
          model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay), input_shape=x_train.shape[1:]))
-         model.add(Activation('relu'))
+         model.add(ELU())
          model.add(BatchNormalization())
          model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
-         model.add(Activation('relu'))
+         model.add(ELU())
          model.add(BatchNormalization())
          model.add(MaxPooling2D(pool_size=(2,2)))
          model.add(Dropout(0.2))
@@ -103,16 +107,16 @@ if __name__ == '__main__':
          model.add(Activation('relu'))
          model.add(BatchNormalization())
          model.add(Conv2D(2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
-         model.add(Activation('relu'))
+         model.add(ELU())
          model.add(BatchNormalization())
          model.add(MaxPooling2D(pool_size=(2,2)))
          model.add(Dropout(0.3))
          
          model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
-         model.add(Activation('relu'))
+         model.add(ELU())
          model.add(BatchNormalization())
          model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
-         model.add(Activation('relu'))
+         model.add(ELU())
          model.add(BatchNormalization())
          model.add(MaxPooling2D(pool_size=(2,2)))
          model.add(Dropout(0.4))
@@ -121,7 +125,11 @@ if __name__ == '__main__':
          
          model.compile(k=3, normalize=True, margin=1)
          
-         model.fit(x_train, y_train, maxEpoch=100, val_set=[x_test, y_test],
-                   snapshot=5)
+         model.fit(x_train, y_train, 
+                   maxEpoch=100, 
+                   val_set=[x_test, y_test],
+                   batch_size=200,
+                   snapshot=5,
+                   tN=tN, tN_val=tN_val)
          
         
