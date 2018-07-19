@@ -14,6 +14,7 @@ from tensorflow.python.keras import utils
 from dlmnn.data.get_img_data import get_dataset
 
 from dlmnn.model.LMNN import lmnn
+from dlmnn.model.LMNNredo import lmnnredo
 
 import numpy as np
 
@@ -22,7 +23,23 @@ def argparser( ):
     import argparse 
     parser = argparse.ArgumentParser(description='''Something''') 
     parser.add_argument('-t', action="store", dest='mtype', type=str,
-                        default='lmnn', help='''model to use''')
+                        default='lmnnredo', help='''model to use''')
+    parser.add_argument('-k', action="store", dest='k', type=int,
+                        default=1, help='''Number of neighbours''')
+    parser.add_argument('-e', action="store", dest='e', type=int,
+                        default=10, help='''epochs''')
+    parser.add_argument('-b', action="store", dest='b', type=int,
+                        default=100, help='''batch size''')
+    parser.add_argument('-m', action="store", dest='m', type=float,
+                        default=1.0, help='''margin''')
+    parser.add_argument('-l', action="store", dest='l', type=float,
+                        default=1e-4, help='''learning rate''')
+    parser.add_argument('-w', action="store", dest='w', type=float,
+                        default=0.5, help='''mu''')
+    parser.add_argument('-r', action="store", dest='r', type=str,
+                        default='res', help='''where to store final results''')
+    parser.add_argument('-n', action="store", dest='n', type=bool,
+                        default=True, help='''L2 normalize features''')
     args = parser.parse_args() 
     args = vars(args) 
     return args
@@ -86,8 +103,9 @@ if __name__ == '__main__':
             metrics=['accuracy'])
         
         model.fit(x_train, y_train,
-                  epochs=100,
-                  validation_data = [x_test, y_test])
+                  epochs=args['e'],
+                  validation_data = [x_test, y_test],
+                  batch_size=args['b'])
         
     elif args['mtype'] == 'lmnn':
          tN, tN_val=np.load('targetNeighbours.npy')
@@ -123,13 +141,53 @@ if __name__ == '__main__':
         
          model.add(Flatten())
          
-         model.compile(k=3, normalize=True, margin=1)
+         model.compile(k=args['k'], normalize=args['n'], margin=args['m'])
          
          model.fit(x_train, y_train, 
-                   maxEpoch=100, 
+                   maxEpoch=args['e'], 
                    val_set=[x_test, y_test],
-                   batch_size=200,
+                   batch_size=args['b'],
                    snapshot=5,
                    tN=tN, tN_val=tN_val)
          
+    elif args['mtype'] == 'lmnnredo':
         
+         model = lmnnredo()
+         
+         model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay), input_shape=x_train.shape[1:]))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(MaxPooling2D(pool_size=(2,2)))
+         model.add(Dropout(0.2))
+         
+         model.add(Conv2D(2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(Activation('relu'))
+         model.add(BatchNormalization())
+         model.add(Conv2D(2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(MaxPooling2D(pool_size=(2,2)))
+         model.add(Dropout(0.3))
+         
+         model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(MaxPooling2D(pool_size=(2,2)))
+         model.add(Dropout(0.4))
+        
+         model.add(Flatten())
+         
+         model.compile(k=args['k'], normalize=args['n'], margin=args['m'])
+         
+         model.fit(x_train, y_train, 
+                   maxEpoch=args['e'], 
+                   val_set=[x_test, y_test],
+                   batch_size=args['b'],
+                   snapshot=5,
+                   redo_step=5)
