@@ -160,12 +160,20 @@ class lmnnredo(object):
         for e in range(maxEpoch):
             stats.on_epoch_begin() # Start epoch
             
-            # Permute target neighbours
-            if (e+1) % (redo_step+1) == 0:
+            # At redo step, recompute target neighbours
+            if (e+1) % redo_step == 0:
+                tN_old = tN
                 Xtrans = self.transform(Xtrain, batch_size=batch_size)
                 tN = findTargetNeighbours(Xtrans, ytrain, self.k, name='Training', do_pca=False)
-            else:
-                tN = np.random.permutation(tN)
+                tN_change = self._tN_change(tN_old, tN)
+                stats.add_stat('tN_change', tN_change)
+                
+                # Write stats to summary protocol buffer
+                summ = tf.Summary(value=[tf.Summary.Value(tag='tN_change', simple_value=tN_change)])
+                self._writer.add_summary(summ, global_step=n_batch_train*e)
+                
+            # Permute target neighbours
+            tN = np.random.permutation(tN)
             
             # Do backpropagation
             for b in range(n_batch_train):
@@ -339,8 +347,22 @@ class lmnnredo(object):
         assert self.built, '''Model is not build, call lmnn.compile() 
                 before this function is called '''
     
+    #%%
+    def _tN_change(self, tN1, tN2):
+        N = int(len(tN1)/self.k)
+        idx1=np.argsort(tN1[:,0])
+        idx2=np.argsort(tN2[:,0])
+        tN1_sort=tN1[idx1]
+        tN2_sort=tN2[idx2]
+        count = 0
+        for i in range(N):
+            count += len(np.intersect1d(tN1_sort[self.k*i:self.k*(i+1),1], 
+                                        tN2_sort[self.k*i:self.k*(i+1),1]))
+        tN_change = 1-count/(N*self.k)
+        return tN_change
+    
 #%%
 if __name__ == '__main__':
     # Construct model
-    model = lmnn()   
+    model = lmnnredo()   
     

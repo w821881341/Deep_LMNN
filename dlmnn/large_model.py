@@ -23,7 +23,7 @@ def argparser( ):
     import argparse 
     parser = argparse.ArgumentParser(description='''Something''') 
     parser.add_argument('-t', action="store", dest='mtype', type=str,
-                        default='lmnnredo', help='''model to use''')
+                        default='lmnredon', help='''model to use''')
     parser.add_argument('-k', action="store", dest='k', type=int,
                         default=1, help='''Number of neighbours''')
     parser.add_argument('-e', action="store", dest='e', type=int,
@@ -36,8 +36,8 @@ def argparser( ):
                         default=1e-4, help='''learning rate''')
     parser.add_argument('-w', action="store", dest='w', type=float,
                         default=0.5, help='''mu''')
-    parser.add_argument('-r', action="store", dest='r', type=str,
-                        default='res', help='''where to store final results''')
+    parser.add_argument('-r', action="store", dest='r', type=int,
+                        default=5, help='''recalculate step''')
     parser.add_argument('-n', action="store", dest='n', type=bool,
                         default=True, help='''L2 normalize features''')
     args = parser.parse_args() 
@@ -190,4 +190,4 @@ if __name__ == '__main__':
                    val_set=[x_test, y_test],
                    batch_size=args['b'],
                    snapshot=5,
-                   redo_step=5)
+                   redo_step=args['r'])
