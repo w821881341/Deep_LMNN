@@ -150,6 +150,19 @@ if __name__ == '__main__':
                    snapshot=5,
                    tN=tN, tN_val=tN_val)
          
+         from dlmnn.helper.neighbor_funcs import findTargetNeighbours
+         x_train_trans = model.transform(x_train)
+         x_test_trans = model.transform(x_test)
+         tN = findTargetNeighbours(x_train_trans, y_train, args['k'], do_pca=False)
+         tN_val = findTargetNeighbours(x_test_trans, y_test, args['k'], do_pca=False)
+         
+         model.fit(x_train, y_train, 
+                   maxEpoch=args['e'], 
+                   val_set=[x_test, y_test],
+                   batch_size=args['b'],
+                   snapshot=5,
+                   tN=tN, tN_val=tN_val)
+     
     elif args['mtype'] == 'lmnnredo':
         
          model = lmnnredo()
