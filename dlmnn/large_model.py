@@ -15,6 +15,7 @@ from dlmnn.data.get_img_data import get_dataset
 
 from dlmnn.model.LMNN import lmnn
 from dlmnn.model.LMNNredo import lmnnredo
+from dlmnn.model.LMNNsmooth import lmnnsmooth
 
 import numpy as np
 
@@ -204,3 +205,46 @@ if __name__ == '__main__':
                    batch_size=args['b'],
                    snapshot=5,
                    redo_step=args['r'])
+         
+    elif args['mtype'] == 'lmnnsmooth':
+         tN, tN_val=np.load('targetNeighbours.npy')
+        
+         model = lmnnsmooth()
+         
+         model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay), input_shape=x_train.shape[1:]))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(MaxPooling2D(pool_size=(2,2)))
+         model.add(Dropout(0.2))
+         
+         model.add(Conv2D(2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(Activation('relu'))
+         model.add(BatchNormalization())
+         model.add(Conv2D(2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(MaxPooling2D(pool_size=(2,2)))
+         model.add(Dropout(0.3))
+         
+         model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+         model.add(ELU())
+         model.add(BatchNormalization())
+         model.add(MaxPooling2D(pool_size=(2,2)))
+         model.add(Dropout(0.4))
+        
+         model.add(Flatten())
+         
+         model.compile(k=args['k'], normalize=args['n'], margin=args['m'])
+         
+         model.fit(x_train, y_train, 
+                   maxEpoch=args['e'], 
+                   val_set=[x_test, y_test],
+                   batch_size=args['b'],
+                   snapshot=5,
+                   tN=tN, tN_val=tN_val)

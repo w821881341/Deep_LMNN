@@ -134,3 +134,35 @@ def tf_LMNN_loss(D, tN, tup, mu, margin=1):
         # Total loss
         loss = (1-mu) * pull_loss + mu * push_loss
         return loss, D_pull, D_tn, D_im
+    
+#%%
+def tf_LMNN_loss_smooth(D, y, tN, mu, margin=1):
+    N = tf.shape(D)[0]
+    n_tN = tf.shape(tN)[0]
+    
+    # All possible combinations
+    possible_imp_array =  tf.expand_dims(tf.reshape(
+            tf.ones((n_tN, N), tf.int32)*tf.range(N), (-1, )), 1)
+    tN_tiled = tf.reshape(tf.tile(tN, [1, N]), (-1, 2))
+    tup = tf.concat([tN_tiled, possible_imp_array], axis=1)
+    
+    # Index for tn and im
+    y = tf.cast(y, tf.float32)
+    tn_y = tf.gather(y, tup[:,1])
+    im_y = tf.gather(y, tup[:,2])
+    cond = tf.equal(tn_y, im_y)
+    cond = tf.cast(cond, tf.float32)
+    
+    # Gather distances
+    D_pull = tf.gather_nd(D, tN)
+    D_tn = tf.gather_nd(D, tup[:,:2])
+    D_im = tf.gather_nd(D, tup[:,::2])
+    
+    # Calculate pull and push loss
+    pull_loss = tf.reduce_sum(D_pull)
+    push_loss = tf.reduce_sum((1.0-cond)*tf.maximum(margin + D_tn - D_im, 0.0))
+    
+    # Total loss
+    loss = (1-mu) * pull_loss + mu * push_loss
+    return loss, D_pull, D_tn, D_im
+    

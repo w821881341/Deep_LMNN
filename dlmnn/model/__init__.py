@@ -7,3 +7,4 @@ Created on Thu May 31 08:39:30 2018
 
 from . import LMNN
 from . import LMNNredo
+from . import LMNNsmooth
