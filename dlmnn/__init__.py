@@ -9,5 +9,4 @@ Created on Thu Dec 14 11:42:10 2017
 #%%
 from . import data
 from . import helper
-from . import model
-from .model.LMNN import lmnn
+from .LMNN import lmnn

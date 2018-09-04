@@ -10,6 +10,7 @@ Created on Thu May 31 10:11:15 2018
 from dlmnn.helper.neighbor_funcs import findTargetNeighbours, knnClassifier
 from dlmnn.helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters
 from dlmnn.helper.tf_funcs import tf_LMNN_loss, tf_featureExtractor
+from dlmnn.helper.tf_funcs import tf_LMNN_loss_smooth
 from dlmnn.helper.layers import L2normalize
 from dlmnn.helper.logger import stat_logger
 from dlmnn.helper.utility import get_optimizer
@@ -21,7 +22,7 @@ import numpy as np
 import datetime, os
 
 #%%
-class lmnn(object):
+class lmnnsmooth(object):
     """   """
     def __init__(self, session=None, dir_loc=None):
         # Initilize session and tensorboard dirs 
@@ -71,8 +72,9 @@ class lmnn(object):
         # Build graph
         D = self.dist_func(self.Xp, self.Xp)
         tup = tf_findImposters(D, self.yp, self.tNp, margin=margin)
-        self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=margin)
-        
+        #self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=margin)
+        self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss_smooth(D, self.yp, self.tNp, mu, 
+                                                             margin=margin)
         # Construct training operation
         self.optimizer = get_optimizer(optimizer)(learning_rate=learning_rate)
         self._trainer = self.optimizer.minimize(self._LMNN_loss, 
