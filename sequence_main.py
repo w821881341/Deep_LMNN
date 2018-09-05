@@ -85,4 +85,4 @@ if __name__ == '__main__':
     # Compare tNs
     for i in range(1,len(all_l)+1):
         print('tN similarity between 0 and ' + 
-              str(i) + ': ' + compare_tN(tN[0], tN[i]))
+              str(i) + ': ', compare_tN(tN[0], tN[i])[0])

@@ -104,6 +104,7 @@ class lmnn(object):
         
     #%%
     def reintialize(self):
+        """ Reintialize all weights in the network """
         self._assert_if_build()
         init = tf.global_variables_initializer()
         self.session.run(init)
@@ -111,7 +112,35 @@ class lmnn(object):
     #%%
     def fit(self, Xtrain, ytrain, maxEpoch=100, batch_size=50, tN=None, 
             run_id=None, verbose=2, snapshot=10, val_set=None, tN_val=None):
-        """
+        """ Fit a deep neural network with lmnn loss
+        
+        Arguments:
+            Xtrain: N x ?, tensor with training data
+            ytrain: N x 1, vector with labels (not one-hot encoded)
+            maxEpoch: integer, number of epochs to run algoritm
+            batch_size: number of samples to feed through network. Not that the
+                actual number of samples that are feed in each iteration is
+                somewhere between 
+                1 + self.k * batch_size < actual < 2 * self.k * batch_size
+            val_set: 2-element list, where the first element is a tensor with
+                similar shape to Xtrain, and the second element is a vector
+                with labels.
+            tN: (N*k) x 2, matrix with k target neighbours for each observation
+                in the training set. If None, the tNs are computed by using the
+                nearest neighbours in a euclidian space
+            tN_val: (M*k) x 2, matrix with k target neighbours for each 
+                observation in the validation set. If None, the tNs are computed 
+                by using the nearest neighbours in a euclidian space
+            run_id: str, name of the folder to save results to (will be created). 
+                If None, will create a folder with the current time
+            verbose: level of output. 0 = no output. 1 = output to consol.
+                2 = output to colsol + results saved to tensorboard
+            snapshot: integer, how often to evaluate on the validation set.
+                Note this is expensive to do, due to accuracy evaluation
+            
+        Output:
+            stats: object containing training stats. See dlmnn.helper.logger
+                for more info
         
         """
         self._assert_if_build()
@@ -249,6 +278,15 @@ class lmnn(object):
     
     #%%    
     def predict(self, Xtest, Xtrain, ytrain, batch_size=64):
+        ''' Predicts the labels of Xtest using KNN
+        Arguments: 
+            Xtest: N x ?, tensor with data to predict labels for
+            Xtrain: M x ?, tensor with training data
+            ytrain: M x 1, vector with training labels
+            batch_size: scalar, number of samples to transform in parallel
+        Output:
+            pred: N x 1, vector with predicted labels
+        '''
         self._assert_if_build()
         Xtest = self.transform(Xtest, batch_size=batch_size)
         Xtrain = self.transform(Xtrain, batch_size=batch_size)
@@ -267,7 +305,7 @@ class lmnn(object):
             k: scalar, number of neighbours to look at
             batch_size: integer, number of samples to transform in parallel
         
-        Output
+        Output:
             accuracy: scalar, accuracy of the prediction for the current metric
         '''
         self._assert_if_build()
@@ -313,6 +351,7 @@ class lmnn(object):
 
     #%%
     def summary(self):
+        """ Gets a summary of the feature extraction model """
         self._assert_if_build()
         print('Model: lmnn')
         print('='*65)
@@ -321,6 +360,7 @@ class lmnn(object):
     
     #%%
     def _get_feed_dict(self, idx_start, idx_end, X, y, tN):
+        """ Utility function for getting a batch of data """
         tN_batch = tN[idx_start:idx_end]
         idx, inv_idx = np.unique(tN_batch, return_inverse=True)
         inv_idx = np.reshape(inv_idx, (-1, 2))
@@ -331,6 +371,7 @@ class lmnn(object):
    
     #%%
     def _assert_if_build(self):
+        """ Utility function for checking if model is compiled """
         assert self.built, '''Model is not build, call lmnn.compile() 
                 before this function is called '''
     

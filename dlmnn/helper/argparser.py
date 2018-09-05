@@ -30,7 +30,7 @@ def lmnn_argparser( ):
     parser.add_argument('-k', action="store", dest='k', type=int,
                         default=3, help='''Number of neighbours''')
     parser.add_argument('-e', action="store", dest='n_epochs', type=int,
-                        default=30, help='''epochs''')
+                        default=50, help='''epochs''')
     parser.add_argument('-b', action="store", dest='batch_size', type=int,
                         default=100, help='''batch size''')
     parser.add_argument('-m', action="store", dest='margin', type=float,
