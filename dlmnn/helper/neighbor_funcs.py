@@ -9,10 +9,28 @@ Created on Thu May 31 11:14:21 2018
 import numpy as np
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.decomposition import PCA
-from dlmnn.helper.utility import progressBar
+from .utility import progressBar
 
 #%%
-def findTargetNeighbours(X, y, k, do_pca=True, name=''):
+def compare_tN(A, B):
+    ''' '''
+    assert A.shape == B.shape, 'assumes A and B to have equal shape'
+    uniq_obs = np.unique(A[:,0])
+    tn = [ ]
+    frac_tn = 0
+    for i in uniq_obs:
+        A_tn = A[np.where(A[:,0]==i)[0],1]
+        B_tn = B[np.where(B[:,0]==i)[0],1]
+        same_tn = np.intersect1d(A_tn, B_tn)
+        n_tn = len(same_tn)
+        tn.append(np.array([n_tn*[i], same_tn]).T)
+        frac_tn += n_tn
+    frac_tn /= len(A)
+    tn = np.array(tn)
+    return frac_tn, tn
+
+#%%
+def findTargetNeighbours(X, y, k, do_pca=True, name=None):
     ''' Numpy/sklearn implementation to find target neighbours for large 
         datasets. This function cannot use the GPU and thus runs on the CPU,
         but instead uses an advance ball-tree method.
@@ -27,12 +45,12 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=''):
         tN: (N*k) x 2 matrix, with target neighbour index. 
     '''
     print(70*'-')
+    name = ' for ' + name if name is not None else ''
     # Reshape data into 2D
     N = X.shape[0]
     X = np.reshape(X, (N, -1))
     if do_pca:
-        print('Doing PCA')
-        pca= PCA(n_components = 0.95)
+        pca = PCA(n_components = 0.95)
         X = pca.fit_transform(X)
     val = np.unique(y) 
     counter = 1
@@ -41,7 +59,7 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=''):
     # Iterate over each class
     for c in val:
         progressBar(counter, len(val), 
-                    name='Finding target neighbours for '+name)
+                    name='Finding target neighbours')
         idx = np.where(y==c)[0]
         n_c = len(idx)
         x = X[idx]

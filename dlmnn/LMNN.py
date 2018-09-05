@@ -7,14 +7,12 @@ Created on Thu May 31 10:11:15 2018
 """
 
 #%%
-from dlmnn.helper.neighbor_funcs import findTargetNeighbours, knnClassifier
-from dlmnn.helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters
-from dlmnn.helper.tf_funcs import tf_LMNN_loss, tf_featureExtractor
-from dlmnn.helper.tf_funcs import tf_LMNN_loss_smooth
-from dlmnn.helper.layers import L2normalize
-from dlmnn.helper.logger import stat_logger
-from dlmnn.helper.utility import get_optimizer
-from dlmnn.helper.embeddings import embedding_projector
+from .helper.neighbor_funcs import findTargetNeighbours, knnClassifier
+from .helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters
+from .helper.tf_funcs import tf_LMNN_loss, tf_featureExtractor
+from .helper.logger import stat_logger
+from .helper.utility import get_optimizer
+from .helper.embeddings import embedding_projector
 
 import tensorflow as tf
 from tensorflow.python.keras import Sequential
@@ -22,11 +20,13 @@ import numpy as np
 import datetime, os
 
 #%%
-class lmnnsmooth(object):
+class lmnn(object):
     """   """
     def __init__(self, session=None, dir_loc=None):
-        # Initilize session and tensorboard dirs 
-        self.session = tf.Session() if session is None else session
+        # Initilize session and tensorboard dirs
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        self.session = tf.Session(config=config) if session is None else session
         self.dir_loc = './logs' if dir_loc is None else dir_loc
         self._writer = None
         
@@ -43,7 +43,7 @@ class lmnnsmooth(object):
     
     #%%    
     def compile(self, k=1, optimizer='adam', learning_rate = 1e-4, 
-              mu=0.5, margin=1, normalize=False):
+              mu=0.5, margin=1):
         """ Builds the tensorflow graph that is evaluated in the fit method """
         assert len(self.extractor.layers)!=0, '''Layers must be added with the 
                 lmnn.add() method before this function is called '''
@@ -51,9 +51,6 @@ class lmnnsmooth(object):
         
         # Set number of neighbours
         self.k = k        
-
-        # Normalize extracted features if asked for
-        if normalize: self.extractor.add(L2normalize())
 
         # Shapes
         self.input_shape = self.extractor.input_shape
@@ -72,9 +69,8 @@ class lmnnsmooth(object):
         # Build graph
         D = self.dist_func(self.Xp, self.Xp)
         tup = tf_findImposters(D, self.yp, self.tNp, margin=margin)
-        #self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=margin)
-        self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss_smooth(D, self.yp, self.tNp, mu, 
-                                                             margin=margin)
+        self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=margin)
+        
         # Construct training operation
         self.optimizer = get_optimizer(optimizer)(learning_rate=learning_rate)
         self._trainer = self.optimizer.minimize(self._LMNN_loss, 
@@ -82,14 +78,14 @@ class lmnnsmooth(object):
         
         # Summaries
         self._n_tup = tf.shape(tup)[0]
-        true_imp = tf.cast(tf.less(D_3, D_2), tf.float32)
+        self._true_imp = tf.cast(tf.less(D_3, D_2), tf.float32)
         features = self.extractor_func(self.Xp)
         tf.summary.scalar('Loss', self._LMNN_loss) 
         tf.summary.scalar('Num_imp', self._n_tup)
         tf.summary.scalar('Loss_pull', tf.reduce_sum(D_1))
         tf.summary.scalar('Loss_push', tf.reduce_sum(margin + D_2 - D_3))
-        tf.summary.scalar('True_imp', tf.reduce_sum(true_imp))
-        tf.summary.scalar('Frac_true_imp', tf.reduce_mean(true_imp))
+        tf.summary.scalar('True_imp', tf.reduce_sum(self._true_imp))
+        tf.summary.scalar('Frac_true_imp', tf.reduce_mean(self._true_imp))
         tf.summary.scalar('Sparsity_tanh', tf.reduce_mean(tf.reduce_sum(
                 tf.tanh(tf.pow(features, 2.0)), axis=1)))
         tf.summary.scalar('Sparsity_l0', tf.reduce_mean(tf.reduce_sum(
@@ -147,7 +143,7 @@ class lmnnsmooth(object):
             N_val = Xval.shape[0]
             n_batch_val = int(np.ceil(N_val / batch_size))
             print('Number of validation samples:  ', N_val)
-        print(70*'-')
+        print(70*'-' + '\n')
         
         # Target neighbours
         if tN is None:
@@ -172,16 +168,18 @@ class lmnnsmooth(object):
                 feed_dict = self._get_feed_dict(self.k*batch_size*b, 
                                                 self.k*batch_size*(b+1),
                                                 Xtrain, ytrain, tN)
-    
+                
                 # Evaluate graph
-                _, loss_out, ntup_out, summ = self.session.run(
-                        [self._trainer, self._LMNN_loss, 
-                         self._n_tup, self._summary], 
+                _, loss_out, ntup_out, ntup_true_out, summ = self.session.run(
+                        [self._trainer, self._LMNN_loss, self._n_tup,
+                         self._true_imp, self._summary], 
                          feed_dict=feed_dict)
                 
                 # Save stats
                 stats.add_stat('loss', loss_out)
                 stats.add_stat('#imp', ntup_out)
+                if ntup_true_out.size: # find frac of true imposters
+                    stats.add_stat('Frac_true_imp', np.mean(ntup_true_out))
                 
                 # Save to tensorboard
                 if verbose==2: 
