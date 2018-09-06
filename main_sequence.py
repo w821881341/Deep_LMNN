@@ -13,7 +13,7 @@ from dlmnn.helper.argparser import lmnn_argparser
 from dlmnn.helper.layers import InputLayer, Flatten, Conv2D, MaxPool2D, \
                                 Dense, LeakyReLU, layerlist
 from dlmnn.data.get_img_data import get_dataset
-from dlmnn.helper.neighbor_funcs import findTargetNeighbours, compare_tN, similarity_tN
+from dlmnn.helper.neighbor_funcs import findTargetNeighbours, similarity_tN
 
 #%% 
 if __name__ == '__main__':
@@ -83,6 +83,5 @@ if __name__ == '__main__':
         tf.reset_default_graph()
         
     # Compare tNs
-    for i in range(1,len(all_l)+1):
-        print('tN similarity between 0 and ' + 
-              str(i) + ': ', compare_tN(tN[0], tN[i])[0])
+    print('Similarity matrix for tNs:')
+    print(similarity_tN(tN, args.k))
