@@ -26,13 +26,15 @@ class _ArgsStruct:
 #%%
 def lmnn_argparser( ):
     import argparse 
-    parser = argparse.ArgumentParser(description='''Something''') 
+    parser = argparse.ArgumentParser(description='''Argument parser for the 
+                                     lmnn model class. Contains the most 
+                                     important parameters for the class''') 
     parser.add_argument('-k', action="store", dest='k', type=int,
                         default=3, help='''Number of neighbours''')
     parser.add_argument('-e', action="store", dest='n_epochs', type=int,
                         default=50, help='''epochs''')
     parser.add_argument('-b', action="store", dest='batch_size', type=int,
-                        default=100, help='''batch size''')
+                        default=200, help='''batch size''')
     parser.add_argument('-m', action="store", dest='margin', type=float,
                         default=1.0, help='''margin''')
     parser.add_argument('-l', action="store", dest='lr', type=float,
@@ -41,8 +43,6 @@ def lmnn_argparser( ):
                         default=0.5, help='''mu''')
     parser.add_argument('-r', action="store", dest='log_folder', type=str,
                         default='res', help='''where to store final results''')
-    parser.add_argument('-n', action="store", dest='normalize', type=bool,
-                        default=True, help='''L2 normalize features''')
     args = parser.parse_args() 
     args = vars(args) 
     args = _ArgsStruct(**args)

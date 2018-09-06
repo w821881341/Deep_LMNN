@@ -12,22 +12,34 @@ from sklearn.decomposition import PCA
 from .utility import progressBar
 
 #%%
-def compare_tN(A, B):
-    ''' '''
+def compare_tN(A, B, k):
+    ''' Compares a list of target neighbours in A to a list of target neighbours
+        in B, and find the procentage that is similar '''
     assert A.shape == B.shape, 'assumes A and B to have equal shape'
-    uniq_obs = np.unique(A[:,0])
-    tn = [ ]
-    frac_tn = 0
-    for i in uniq_obs:
-        A_tn = A[np.where(A[:,0]==i)[0],1]
-        B_tn = B[np.where(B[:,0]==i)[0],1]
-        same_tn = np.intersect1d(A_tn, B_tn)
+    n = len(A)
+    A = A[np.argsort(A[:,0])]
+    B = B[np.argsort(B[:,0])]
+    frac_same, tN = 0, [ ]
+    for i, j in enumerate(range(0,n,k)):
+        same_tn = np.intersect1d(A[j:j+k, 1], B[j:j+k, 1])
         n_tn = len(same_tn)
-        tn.append(np.array([n_tn*[i], same_tn]).T)
-        frac_tn += n_tn
-    frac_tn /= len(A)
-    tn = np.array(tn)
-    return frac_tn, tn
+        frac_same += n_tn
+        tN.append(np.array([n_tn*[i], same_tn]).T)
+    frac_same /= n
+    tN = np.vstack(tN)
+    return frac_same, tN
+ 
+#%%
+def similarity_tN(list_tN, k):
+    ''' Takes a list of tNs arrays and computes a similarity matrix between all
+        pairs '''
+    n = len(list_tN)
+    sim_mat = np.zeros((n,n))
+    for i in range(n):
+        for j in range(n):
+            if i < j:
+                sim_mat[i,j] = compare_tN(list_tN[i], list_tN[j], k)[0]
+    return sim_mat.round(3)
 
 #%%
 def findTargetNeighbours(X, y, k, do_pca=True, name=None):
@@ -58,8 +70,8 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=None):
     tN = np.zeros((N*k, 2), np.int32)
     # Iterate over each class
     for c in val:
-        progressBar(counter, len(val), 
-                    name='Finding target neighbours')
+        progressBar(counter, len(val), name='Finding target neighbours')
+        # Extract class c
         idx = np.where(y==c)[0]
         n_c = len(idx)
         x = X[idx]

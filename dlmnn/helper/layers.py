@@ -31,6 +31,10 @@ class layerlist(object):
         
     def get_layer(self, index):
         return self.layers[index](**self.layers_args[index])
+    
+    @property
+    def n_layers(self):
+        return len(self.layers)
 
 
 #%%

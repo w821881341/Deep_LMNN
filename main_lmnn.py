@@ -20,7 +20,7 @@ if __name__ == '__main__':
     print(args)
     
     # Get some data 
-    X_train, y_train, X_test, y_test = get_dataset('mnist') 
+    X_train, y_train, X_test, y_test = get_dataset('cifar10') 
     input_shape=X_train.shape[1:]
     
     # Make model 

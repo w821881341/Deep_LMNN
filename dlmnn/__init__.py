@@ -10,3 +10,4 @@ Created on Thu Dec 14 11:42:10 2017
 from . import data
 from . import helper
 from .LMNN import lmnn
+from .LMNNSequential import sequental_lmnn

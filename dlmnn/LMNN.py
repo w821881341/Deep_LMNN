@@ -21,7 +21,7 @@ import datetime, os
 
 #%%
 class lmnn(object):
-    """   """
+    """  Large margin nearest neighbour model class  """
     def __init__(self, session=None, dir_loc=None):
         # Initilize session and tensorboard dirs
         config = tf.ConfigProto()
@@ -44,9 +44,27 @@ class lmnn(object):
     #%%    
     def compile(self, k=1, optimizer='adam', learning_rate = 1e-4, 
               mu=0.5, margin=1):
-        """ Builds the tensorflow graph that is evaluated in the fit method """
+        """ Builds the tensorflow graph that is evaluated in the fit method 
+        
+        Arguments:
+            k: integer, number of target neighbours
+            optimizer: string, name of optimizer to use. See dlmnn.helper.utility
+                for which optimizers that are supported
+            learning_rate: scalar, learning rate for optimizer
+            mu: scalar, weighting of the pull and push term. Should be between 0
+                and 1. High values put weight on the push term and vice verse for
+                the pull term
+            margin: scalar, size of margin inforcing between similar pairs and
+                imposters. Should be higher than 0.
+        """
+        assert k > 0 and isinstance(k, int), ''' k need to be a positive integer '''   
+        assert learning_rate > 0, ''' learning rate needs to be a positive number '''
+        assert 0 <= mu and mu <= 1, ''' mu needs to be between 0 and 1 '''
+        assert margin > 0, ''' margin needs to be a positive number '''
+        
         assert len(self.extractor.layers)!=0, '''Layers must be added with the 
                 lmnn.add() method before this function is called '''
+        
         self.built = True
         
         # Set number of neighbours
@@ -72,9 +90,9 @@ class lmnn(object):
         self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=margin)
         
         # Construct training operation
-        self.optimizer = get_optimizer(optimizer)(learning_rate=learning_rate)
-        self._trainer = self.optimizer.minimize(self._LMNN_loss, 
-                                                global_step=self.global_step)
+        self._optimizer = get_optimizer(optimizer)(learning_rate=learning_rate)
+        self._trainer = self._optimizer.minimize(self._LMNN_loss, 
+                                                 global_step=self.global_step)
         
         # Summaries
         self._n_tup = tf.shape(tup)[0]
@@ -244,7 +262,7 @@ class lmnn(object):
             # Check if we should terminate
             if stats.terminate: break
             
-            # Write stats to console (if verbose=True)
+            # Write stats to console (if verbose>0)
             stats.write_stats()
             
         stats.on_train_end() # End training
@@ -253,7 +271,6 @@ class lmnn(object):
         self.save_weights(run_id + '/trained_metric')
         stats.save(self.current_loc + '/training_stats')
         return stats
-                
                 
     #%%
     def transform(self, X, batch_size=64):
@@ -316,6 +333,7 @@ class lmnn(object):
     #%%
     def save_weights(self, filename, step=None):
         ''' Save all weights/variables in the current session to a file 
+        
         Arguments:
             filename: str, name of the file to write to
             step: integer, appended to the filename to distingues different saved
@@ -326,9 +344,10 @@ class lmnn(object):
         saver.save(self.session, self.dir_loc+'/'+filename, global_step = step)
     
     #%%
-    def save_embeddings(self, data, direc=None, labels=None):
+    def save_embeddings(self, data, labels=None, direc=None):
         """ Embed some data with the current network, and save these to
             tensorboard for vizualization
+            
         Arguments:
             data: data to embed, shape must be equal to model.input_shape
             direc: directory to save data to
@@ -372,11 +391,12 @@ class lmnn(object):
     #%%
     def _assert_if_build(self):
         """ Utility function for checking if model is compiled """
-        assert self.built, '''Model is not build, call lmnn.compile() 
-                before this function is called '''
+        assert self.built, '''Model is not build, call model.compile() 
+                before this method is called. '''
     
 #%%
 if __name__ == '__main__':
-    # Construct model
-    model = lmnn()   
-    
+    model = lmnn()
+        
+            
+            

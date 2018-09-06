@@ -13,7 +13,7 @@ from dlmnn.helper.argparser import lmnn_argparser
 from dlmnn.helper.layers import InputLayer, Flatten, Conv2D, MaxPool2D, \
                                 Dense, LeakyReLU, layerlist
 from dlmnn.data.get_img_data import get_dataset
-from dlmnn.helper.neighbor_funcs import findTargetNeighbours, compare_tN
+from dlmnn.helper.neighbor_funcs import findTargetNeighbours, compare_tN, similarity_tN
 
 #%% 
 if __name__ == '__main__':
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     print(args)
     
     # Get some data 
-    X_train, y_train, X_test, y_test = get_dataset('mnist') 
+    X_train, y_train, X_test, y_test = get_dataset('cifar10') 
     input_shape=X_train.shape[1:]
           
     # Get a layer list we can retrive layers from
