@@ -8,6 +8,39 @@ Created on Mon Dec 11 11:15:02 2017
 #%%
 import tensorflow as tf
 import numpy as np
+#%%
+def findImposterNeighbours(X, y, k, do_pca=True, name=None):
+    '''
+    Arguments:
+        X: N x ?, metrix or tensor with data
+        y: N x 1, vector with labels
+        k: scalar, number of target neighbours to find
+        do_pca: bool, if true then the data will first be projected onto
+                a pca-space which captures 95% of the variation in data
+        name: str, name of the dataset (just for printing)
+    Output:
+        tN: (N*k) x 2 matrix, with target neighbour index.
+    '''
+    name = ' for ' + name if name is not None else ''
+    
+    # Reshape data into 2D
+    N = X.shape[0]
+    X = np.reshape(X, (N, -1))
+    
+    # Do pca feature reduction if wanted
+    if do_pca:
+        pca = PCA(n_components = 0.95)
+        X = pca.fit_transform(X)
+        
+    # Loop over all points, and find closest neighbours with different labels
+    imp = np.zeros((N*k, 2), np.int32)
+    for i in tqdm(range(N), desc='Finding imposters' + name):
+        dist = np.linalg.norm(X - X[i], axis=1)
+        idx = np.argsort(dist)
+        y_idx = y[idx]
+        imp_idx = np.where(y_idx[0] != y_idx)[0]
+        imp[i*k:(i+1)*k] = np.vstack((k*[i], idx[imp_idx[:k]])).T
+    return imp
 
  #%%
     def plot_metric(self, X, y, metric):

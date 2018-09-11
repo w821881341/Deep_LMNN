@@ -45,7 +45,7 @@ if __name__ == '__main__':
     l1 = [0,1,2,3,10,11,12]
     l2 = [0,1,2,3,4,5,6,10,11,12]
     l3 = [0,1,2,3,4,5,6,7,8,9,10,11,12]
-    all_l = [l1, l2, l3]
+    all_l = [l1, l2, l3, l3]
     
     # Do sequence of model fittings
     tN = [findTargetNeighbours(X_train, y_train, args.k)]

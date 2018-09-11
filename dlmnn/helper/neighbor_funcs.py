@@ -9,7 +9,9 @@ Created on Thu May 31 11:14:21 2018
 import numpy as np
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.decomposition import PCA
-from .utility import progressBar
+from sklearn.metrics import pairwise_distances
+from tqdm import tqdm
+from .utility import batchifier
 
 #%%
 def compare_tN(A, B, k):
@@ -56,7 +58,6 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=None):
     Output:
         tN: (N*k) x 2 matrix, with target neighbour index. 
     '''
-    print(70*'-')
     name = ' for ' + name if name is not None else ''
     # Reshape data into 2D
     N = X.shape[0]
@@ -69,8 +70,7 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=None):
     tN_count = 0
     tN = np.zeros((N*k, 2), np.int32)
     # Iterate over each class
-    for c in val:
-        progressBar(counter, len(val), name='Finding target neighbours')
+    for c in tqdm(val, desc='Finding target neighbours' + name):
         # Extract class c
         idx = np.where(y==c)[0]
         n_c = len(idx)
@@ -84,9 +84,35 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=None):
             tN[tN_count:tN_count+n_c,1] = idx[indices[:,kk]]
             tN_count += n_c
         counter += 1
-    print('')
-    print(70*'-')
+    tN = tN[np.argsort(tN[:,0])] # sort by first observation
     return tN
+
+#%%
+def findImposterNeighbours(X, y, k, do_pca=True, name=None, batch_size=64):
+    name = ' for ' + name if name is not None else ''
+    # Reshape data into 2D
+    N = X.shape[0]
+    X = np.reshape(X, (N, -1))
+    
+    # Do pca feature reduction if wanted
+    if do_pca:
+        pca = PCA(n_components = 0.95)
+        X = pca.fit_transform(X)
+        
+    # Loop over all points (in batches), and find closest neighbours with different labels
+    imp = np.zeros((N*k, 2), np.int32)
+    counter = 0
+    for X_batch in tqdm(batchifier(X, batch_size), desc='Finding imposters' + name):
+        dist = pairwise_distances(X_batch, X)
+        n = dist.shape[0]
+        idx = np.argsort(dist, axis=1)
+        y_idx = y[idx]
+        for i in range(n):
+            imp_idx = np.where(y_idx[i,0] != y_idx[i])[0]
+            imp[(counter+i)*k:(counter+i+1)*k] = np.vstack((k*[counter+i], 
+                                                          idx[i,imp_idx[:k]])).T
+        counter += batch_size
+    return imp
 
 #%%
 def _weight_func(distances):

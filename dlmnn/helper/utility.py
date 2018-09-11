@@ -7,6 +7,58 @@ Created on Tue Dec 12 11:23:37 2017
 
 import tensorflow as tf
 import os, sys
+import numpy as np
+
+#%%
+class batch_builder():
+    def __init__(self, tN, imp, k, batch_size):
+        # Append imposters to target neighbour structure
+        imp_r = imp[:,1].repeat(k) # repeat the imposters
+        imp_r = imp_r.reshape((-1,k,k)).transpose((0,2,1)).reshape((-1,k))
+        self.combined = np.hstack((tN, imp_r))
+        
+        # Shuffel
+        self.combined = np.random.permutation(self.combined)
+        
+        # Constants
+        self.batch_size = batch_size
+        self.counter = 0
+        self.n = tN.shape[0]
+        
+    def __next__(self):
+        batch_idx = self.combined[self.counter:self.counter+self.batch_size]
+        self.counter += self.batch_size
+        idx, inv_idx = np.unique(batch_idx, return_inverse=True)
+        inv_idx = np.reshape(inv_idx, (-1, 5))[:,:2]
+        return idx, inv_idx
+        
+    def __iter__(self):
+        return self
+    
+    def __len__(self):
+        return int(np.ceil(self.n / self.batch_size))
+
+#%%
+class batchifier():
+    ''' Small iterator that will cut the input data into smaller batches. Can
+        then be used in a for-loop like:
+            for x_batch in batchifier(X, 100):
+                # x_batch.shape[0] = 100            
+    '''
+                
+    def __init__(self, data, batch_size):
+        self.data = data
+        self.batch_size = batch_size    
+        self.counter = 0
+        self.N = self.data.shape[0]
+    
+    def __iter__(self):
+        while self.counter < self.N:
+            yield self.data[self.counter:self.counter+self.batch_size]
+            self.counter += self.batch_size
+
+    def __len__(self):
+        return int(np.ceil(self.data.shape[0] / self.batch_size))
 
 #%%
 def get_dir(file):

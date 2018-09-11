@@ -7,11 +7,11 @@ Created on Thu May 31 10:11:15 2018
 """
 
 #%%
-from .helper.neighbor_funcs import findTargetNeighbours, knnClassifier
+from .helper.neighbor_funcs import findTargetNeighbours, findImposterNeighbours, knnClassifier
 from .helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters
 from .helper.tf_funcs import tf_LMNN_loss, tf_featureExtractor
 from .helper.logger import stat_logger
-from .helper.utility import get_optimizer
+from .helper.utility import get_optimizer, batch_builder
 from .helper.embeddings import embedding_projector
 
 import tensorflow as tf
@@ -128,8 +128,8 @@ class lmnn(object):
         self.session.run(init)
     
     #%%
-    def fit(self, Xtrain, ytrain, maxEpoch=100, batch_size=50, tN=None, 
-            run_id=None, verbose=2, snapshot=10, val_set=None, tN_val=None):
+    def fit(self, Xtrain, ytrain, maxEpoch=100, batch_size=50, tN=None, imp=None,
+            run_id=None, verbose=2, snapshot=10, val_set=None, tN_val=None, imp_val=None):
         """ Fit a deep neural network with lmnn loss
         
         Arguments:
@@ -192,29 +192,36 @@ class lmnn(object):
             print('Number of validation samples:  ', N_val)
         print(70*'-' + '\n')
         
-        # Target neighbours
+        # Target neighbours and imposters
         if tN is None:
-            tN = findTargetNeighbours(Xtrain, ytrain, self.k, name='Training')
+            tN = findTargetNeighbours(Xtrain, ytrain, self.k, name='training')
         if validation and tN_val is None:
-            tN_val = findTargetNeighbours(Xval, yval, self.k, name='Validation')
-    
+            tN_val = findTargetNeighbours(Xval, yval, self.k, name='validation')
+        if imp is None:
+            imp = findImposterNeighbours(Xtrain, ytrain, self.k, name='training')
+        if validation and imp_val is None:
+            imp_val = findImposterNeighbours(Xval, yval, self.k, name='validation')
+            
         # Training loop
         stats = stat_logger(maxEpoch, n_batch_train, verbose=verbose)
         stats.on_train_begin() # Start training
         for e in range(maxEpoch):
             stats.on_epoch_begin() # Start epoch
             
-            # Permute target neighbours
-            tN = np.random.permutation(tN)
+            get_batches = batch_builder(tN, imp, self.k, batch_size)
             
             # Do backpropagation
             for b in range(n_batch_train):
                 stats.on_batch_begin() # Start batch
                 
+                idx, tN = next(get_batches)
                 # Get data
-                feed_dict = self._get_feed_dict(self.k*batch_size*b, 
-                                                self.k*batch_size*(b+1),
-                                                Xtrain, ytrain, tN)
+#                feed_dict = self._get_feed_dict(self.k*batch_size*b, 
+#                                                self.k*batch_size*(b+1),
+#                                                Xtrain, ytrain, tN)
+                feed_dict = {self.Xp: Xtrain[idx], 
+                             self.yp: ytrain[idx], 
+                             self.tNp: tN}
                 
                 # Evaluate graph
                 _, loss_out, ntup_out, ntup_true_out, summ = self.session.run(
