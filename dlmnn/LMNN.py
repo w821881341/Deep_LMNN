@@ -11,7 +11,7 @@ from .helper.neighbor_funcs import findTargetNeighbours, findImposterNeighbours,
 from .helper.tf_funcs import tf_makePairwiseFunc, tf_findImposters
 from .helper.tf_funcs import tf_LMNN_loss, tf_featureExtractor
 from .helper.logger import stat_logger
-from .helper.utility import get_optimizer, batch_builder
+from .helper.utility import get_optimizer, lmnn_batch_builder
 from .helper.embeddings import embedding_projector
 
 import tensorflow as tf
@@ -208,20 +208,13 @@ class lmnn(object):
         for e in range(maxEpoch):
             stats.on_epoch_begin() # Start epoch
             
-            get_batches = batch_builder(tN, imp, self.k, batch_size)
-            
             # Do backpropagation
-            for b in range(n_batch_train):
+            for b, (X_batch, y_batch, tN_batch) in enumerate(lmnn_batch_builder(Xtrain, ytrain, tN, imp,
+                                                                               self.k, self.batch_size)):
                 stats.on_batch_begin() # Start batch
                 
-                idx, tN = next(get_batches)
-                # Get data
-#                feed_dict = self._get_feed_dict(self.k*batch_size*b, 
-#                                                self.k*batch_size*(b+1),
-#                                                Xtrain, ytrain, tN)
-                feed_dict = {self.Xp: Xtrain[idx], 
-                             self.yp: ytrain[idx], 
-                             self.tNp: tN}
+                # Construct feed dict
+                feed_dict = {self.Xp: X_batch, self.yp: y_batch, self.tNp: tN_batch}
                 
                 # Evaluate graph
                 _, loss_out, ntup_out, ntup_true_out, summ = self.session.run(
@@ -243,11 +236,13 @@ class lmnn(object):
             # If we are at an snapshot epoch and are doing validation
             if validation and ((e+1) % snapshot == 0 or (e+1) == maxEpoch or e==0):
                 # Evaluate loss and tuples on val data
-                tN_val = np.random.permutation(tN_val)
-                for b in range(n_batch_val):
-                    feed_dict = self._get_feed_dict(self.k*batch_size*b, 
-                                                    self.k*batch_size*(b+1),
-                                                    Xval, yval, tN_val)
+                for X_batch, y_batch, tN_batch in lmnn_batch_builder(Xval, yval, tN_val,
+                                                                     imp_val, self.k,
+                                                                     self.batch_size):
+                    # Construct feed dict
+                    feed_dict = {self.Xp: X_batch, self.yp: y_batch, self.tNp: tN_batch}
+                
+                    # Compute loss
                     loss_out= self.session.run(self._LMNN_loss, feed_dict=feed_dict)
                     stats.add_stat('loss_val', loss_out)
                 

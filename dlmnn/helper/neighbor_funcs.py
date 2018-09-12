@@ -88,7 +88,7 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=None):
     return tN
 
 #%%
-def findImposterNeighbours(X, y, k, do_pca=True, name=None, batch_size=64):
+def findImposterNeighbours(X, y, k, do_pca=True, name=None, batch_size=256):
     name = ' for ' + name if name is not None else ''
     # Reshape data into 2D
     N = X.shape[0]

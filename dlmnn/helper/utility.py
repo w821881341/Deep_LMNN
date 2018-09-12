@@ -10,15 +10,20 @@ import os, sys
 import numpy as np
 
 #%%
-class batch_builder():
-    def __init__(self, tN, imp, k, batch_size):
+class lmnn_batch_builder():
+    def __init__(self, X, y, tN, imp, k, batch_size, shuffel=True):
+        # Data
+        self.X = X
+        self.y = y
+        
         # Append imposters to target neighbour structure
         imp_r = imp[:,1].repeat(k) # repeat the imposters
         imp_r = imp_r.reshape((-1,k,k)).transpose((0,2,1)).reshape((-1,k))
         self.combined = np.hstack((tN, imp_r))
         
         # Shuffel
-        self.combined = np.random.permutation(self.combined)
+        if shuffel:
+            self.combined = np.random.permutation(self.combined)
         
         # Constants
         self.batch_size = batch_size
@@ -30,10 +35,15 @@ class batch_builder():
         self.counter += self.batch_size
         idx, inv_idx = np.unique(batch_idx, return_inverse=True)
         inv_idx = np.reshape(inv_idx, (-1, 5))[:,:2]
-        return idx, inv_idx
-        
+        return self.X[idx], self.y[idx], inv_idx
+    
     def __iter__(self):
-        return self
+        while self.counter < self.n:
+            batch_idx = self.combined[self.counter:self.counter+self.batch_size]
+            self.counter += self.batch_size
+            idx, inv_idx = np.unique(batch_idx, return_inverse=True)
+            inv_idx = np.reshape(inv_idx, (-1, 5))[:,:2]
+            yield self.X[idx], self.y[idx], inv_idx
     
     def __len__(self):
         return int(np.ceil(self.n / self.batch_size))
