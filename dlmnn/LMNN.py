@@ -184,33 +184,35 @@ class lmnn(object):
         n_batch_train = int(np.ceil(N_train / batch_size))
         print(70*'-')
         print('Number of training samples:    ', N_train)
+        print('Number of training batches:    ', n_batch_train) 
         if validation:
             Xval = Xval.astype('float32')
             yval = yval.astype('int32')
             N_val = Xval.shape[0]
             n_batch_val = int(np.ceil(N_val / batch_size))
             print('Number of validation samples:  ', N_val)
+            print('Number of validation batches:  ', n_batch_val)
         print(70*'-' + '\n')
         
         # Target neighbours and imposters
         if tN is None:
             tN = findTargetNeighbours(Xtrain, ytrain, self.k, name='training')
-        if validation and tN_val is None:
-            tN_val = findTargetNeighbours(Xval, yval, self.k, name='validation')
         if imp is None:
             imp = findImposterNeighbours(Xtrain, ytrain, self.k, name='training')
+        if validation and tN_val is None:
+            tN_val = findTargetNeighbours(Xval, yval, self.k, name='validation')
         if validation and imp_val is None:
             imp_val = findImposterNeighbours(Xval, yval, self.k, name='validation')
             
         # Training loop
-        stats = stat_logger(maxEpoch, n_batch_train, verbose=verbose)
+        stats = stat_logger(maxEpoch, self.k*n_batch_train, verbose=verbose)
         stats.on_train_begin() # Start training
         for e in range(maxEpoch):
             stats.on_epoch_begin() # Start epoch
             
             # Do backpropagation
-            for b, (X_batch, y_batch, tN_batch) in enumerate(lmnn_batch_builder(Xtrain, ytrain, tN, imp,
-                                                                               self.k, self.batch_size)):
+            for b, (X_batch, y_batch, tN_batch) in enumerate(
+                    lmnn_batch_builder(Xtrain, ytrain, tN, imp, self.k, batch_size)):
                 stats.on_batch_begin() # Start batch
                 
                 # Construct feed dict
@@ -236,9 +238,8 @@ class lmnn(object):
             # If we are at an snapshot epoch and are doing validation
             if validation and ((e+1) % snapshot == 0 or (e+1) == maxEpoch or e==0):
                 # Evaluate loss and tuples on val data
-                for X_batch, y_batch, tN_batch in lmnn_batch_builder(Xval, yval, tN_val,
-                                                                     imp_val, self.k,
-                                                                     self.batch_size):
+                for X_batch, y_batch, tN_batch in lmnn_batch_builder(
+                        Xval, yval, tN_val, imp_val, self.k, batch_size):
                     # Construct feed dict
                     feed_dict = {self.Xp: X_batch, self.yp: y_batch, self.tNp: tN_batch}
                 
@@ -253,12 +254,21 @@ class lmnn(object):
                 if verbose==2:
                     # Write stats to summary protocol buffer
                     summ = tf.Summary(value=[
-                        tf.Summary.Value(tag='Loss_val', simple_value=np.mean(stats.get_stat('loss_val'))),
-                        tf.Summary.Value(tag='Accuracy_val', simple_value=np.mean(stats.get_stat('acc_val')))])
+                        tf.Summary.Value(tag='Loss_val', simple_value=
+                                         np.mean(stats.get_stat('loss_val'))),
+                        tf.Summary.Value(tag='Accuracy_val', simple_value=
+                                         np.mean(stats.get_stat('acc_val')))])
              
                     # Save to tensorboard
                     self._writer.add_summary(summ, global_step=n_batch_train*e)
-                           
+            
+            # If we are at an snapshot epoch, then recompute the imposters
+            if (e+1) % snapshot == 0:
+                Xtrain_trans = self.transform(Xtrain)
+                Xval_trans = self.transform(Xval)
+                imp = findImposterNeighbours(Xtrain_trans, ytrain, self.k, name='training')
+                imp_val = findImposterNeighbours(Xval_trans, yval, self.k, name='validation')
+                
             stats.on_epoch_end() # End epoch
             
             # Check if we should terminate

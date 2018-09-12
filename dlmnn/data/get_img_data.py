@@ -14,7 +14,7 @@ import numpy as _np
 import urllib as _urllib
 import tarfile as _tarfile
 import pickle as _pickle
-
+   
 #%%
 def get_mnist():
     """ Downloads mnist from internet """
@@ -194,6 +194,17 @@ def get_dataset(name='mnist'):
     assert (name in datasets), 'Unknown dataset, choose between: ' \
             + ', '.join([k for k in datasets.keys()])
     return datasets[name]()
+
+#%%
+def get_birds():
+    """ Downloads the cubs 200 dataset """
+    direc = _get_dir(__file__)
+    _create_dir(direc+'/data_files')
+    _create_dir(direc+'/data_files/cubs_200')
+    _os.system('cd data_files/cubs_200')
+    if not _os.path.isdir(direc+'/data_files/cubs_200'):
+        _os.system('wget http://www.vision.caltech.edu/visipedia-data/CUB-200-2011/CUB_200_2011.tgz')
+        _os.system('tar -xzf CUB_200_2011.tgz')
 
 #%%
 if __name__ == '__main__':    

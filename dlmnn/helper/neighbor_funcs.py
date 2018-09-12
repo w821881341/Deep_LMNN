@@ -70,20 +70,22 @@ def findTargetNeighbours(X, y, k, do_pca=True, name=None):
     tN_count = 0
     tN = np.zeros((N*k, 2), np.int32)
     # Iterate over each class
-    for c in tqdm(val, desc='Finding target neighbours' + name):
-        # Extract class c
-        idx = np.where(y==c)[0]
-        n_c = len(idx)
-        x = X[idx]
-        # Find the nearest neighbours
-        nbrs = NearestNeighbors(n_neighbors=k+1, algorithm='brute')
-        nbrs.fit(x)
-        _, indices = nbrs.kneighbors(x)
-        for kk in range(1,k+1):
-            tN[tN_count:tN_count+n_c,0] = idx[indices[:,0]]
-            tN[tN_count:tN_count+n_c,1] = idx[indices[:,kk]]
-            tN_count += n_c
-        counter += 1
+    with tqdm(total=N, desc='Finding target neighbours' + name) as progress_bar:
+        for c in val:
+            # Extract class c
+            idx = np.where(y==c)[0]
+            n_c = len(idx)
+            x = X[idx]
+            # Find the nearest neighbours
+            nbrs = NearestNeighbors(n_neighbors=k+1, algorithm='brute')
+            nbrs.fit(x)
+            _, indices = nbrs.kneighbors(x)
+            for kk in range(1,k+1):
+                tN[tN_count:tN_count+n_c,0] = idx[indices[:,0]]
+                tN[tN_count:tN_count+n_c,1] = idx[indices[:,kk]]
+                tN_count += n_c
+            counter += 1
+            progress_bar.update(n_c)
     tN = tN[np.argsort(tN[:,0])] # sort by first observation
     return tN
 
@@ -102,16 +104,18 @@ def findImposterNeighbours(X, y, k, do_pca=True, name=None, batch_size=256):
     # Loop over all points (in batches), and find closest neighbours with different labels
     imp = np.zeros((N*k, 2), np.int32)
     counter = 0
-    for X_batch in tqdm(batchifier(X, batch_size), desc='Finding imposters' + name):
-        dist = pairwise_distances(X_batch, X)
-        n = dist.shape[0]
-        idx = np.argsort(dist, axis=1)
-        y_idx = y[idx]
-        for i in range(n):
-            imp_idx = np.where(y_idx[i,0] != y_idx[i])[0]
-            imp[(counter+i)*k:(counter+i+1)*k] = np.vstack((k*[counter+i], 
-                                                          idx[i,imp_idx[:k]])).T
-        counter += batch_size
+    with tqdm(total=N, desc='Finding imposters' + name) as progress_bar:
+        for X_batch in batchifier(X, batch_size):
+            dist = pairwise_distances(X_batch, X)
+            n = dist.shape[0]
+            idx = np.argsort(dist, axis=1)
+            y_idx = y[idx]
+            for i in range(n):
+                imp_idx = np.where(y_idx[i,0] != y_idx[i])[0]
+                imp[(counter+i)*k:(counter+i+1)*k] = np.vstack((k*[counter+i], 
+                                                              idx[i,imp_idx[:k]])).T
+            counter += batch_size
+            progress_bar.update(n)
     return imp
 
 #%%
