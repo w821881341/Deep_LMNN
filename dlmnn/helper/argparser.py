@@ -7,7 +7,7 @@ Created on Tue Sep  4 14:10:48 2018
 """
 
 #%%
-class _ArgsStruct:
+class ArgsStruct:
     def __init__(self, **entries):
         self._entries = entries
         self.__dict__.update(entries)
@@ -39,13 +39,13 @@ def lmnn_argparser( ):
                         default=1.0, help='''margin''')
     parser.add_argument('-l', action="store", dest='lr', type=float,
                         default=1e-4, help='''learning rate''')
-    parser.add_argument('-w', action="store", dest='weight', type=float,
+    parser.add_argument('-w', action="store", dest='mu', type=float,
                         default=0.5, help='''mu''')
     parser.add_argument('-r', action="store", dest='log_folder', type=str,
                         default='res', help='''where to store final results''')
     args = parser.parse_args() 
     args = vars(args) 
-    args = _ArgsStruct(**args)
+    args = ArgsStruct(**args)
     return args
 
 #%%

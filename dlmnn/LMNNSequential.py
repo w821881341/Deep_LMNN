@@ -21,15 +21,19 @@ class sequental_lmnn(lmnn):
     def __init__(self, session=None, dir_loc=None):
         super().__init__(session, dir_loc)
         self._layerlist = layerlist()
+        self.model_list = [ ]
+        self.model_list_set = False
         
         # These list may need to be expanded
         self._parametric_layers = (Dense, Conv2D)
         self._nonparametric_layers = (InputLayer, MaxPool2D, Flatten, LeakyReLU)
-        
+    
+    #%%
     def add(self, layer, **arguments):
         ''' Add a layer and the arguments for the layer to layer list '''
         self._layerlist.add(layer, **arguments)
     
+    #%%
     def determine_models(self):
         ''' Function for determing the set of models that we should train. The
             paradigm is the following:
@@ -84,8 +88,27 @@ class sequental_lmnn(lmnn):
             para_layers_found = 0
             models.append(current_list)
             
-        return models
+        self.model_list = models
+        self.model_list_set = True
+    
+    #%%
+    def set_model_list(self, break_layers, end_layers):
+        # Number of layers
+        n_layers = self._layerlist.n_layers
+        assert n_layers > 0, 'Add layers to the model before trying to fit'
         
+        # Make break point models
+        models = [ ]
+        for bl in break_layers:
+            current_list = [ ]
+            for i in range(bl+1): current_list.append(i)
+            for i in end_layers: current_list.append(i)
+            models.append(current_list)
+        models.append([i for i in range(n_layers)]) # full model
+        self.model_list = models
+        self.model_list_set = True
+        
+    #%%    
     def fit_sequential(self, Xtrain, ytrain, epochs_pr_model=50, batch_size=50, 
                        run_id=None, verbose=2, snapshot=10, val_set=None, k=1, 
                        optimizer='adam', learning_rate = 1e-4, mu=0.5, margin=1):
@@ -97,8 +120,9 @@ class sequental_lmnn(lmnn):
             Xval, yval = val_set
         
         # Find valid models
-        model_list = self.determine_models()
-        n_models = len(model_list)
+        if not self.model_list_set:
+            self.determine_models()
+        n_models = len(self.model_list)
         
         # Find initial tNs
         tN = [findTargetNeighbours(Xtrain, ytrain, k)]
@@ -110,7 +134,7 @@ class sequental_lmnn(lmnn):
         for i in range(n_models):
             # Construct the extractor
             self.extractor = Sequential()
-            for l in model_list[i]: self.extractor(self._layerlist.get_layer[l])
+            for l in self.model_list[i]: self.extractor(self._layerlist.get_layer[l])
             
             # Compile model
             self.compile(k=k, optimizer=optimizer, learning_rate=learning_rate,

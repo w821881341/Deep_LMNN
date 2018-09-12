@@ -45,7 +45,7 @@ if __name__ == '__main__':
     
     # Compile model 
     model.compile(k=args.k, optimizer='adam', learning_rate=args.lr,  
-                  mu=args.weight, margin=args.margin)
+                  mu=args.mu, margin=args.margin)
      
     # Fit model and save result 
     model.fit(X_train, y_train,  

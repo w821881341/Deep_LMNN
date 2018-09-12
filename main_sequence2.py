@@ -42,14 +42,14 @@ if __name__ == '__main__':
     model.add(LeakyReLU, alpha=0.3)
     
     # Fit model
-    model.fit_sequential(X_train, y_train, 
-                         maxEpoch=args.n_epochs, 
-                         batch_size=args.batch_size, 
-                         verbose=2, 
-                         snapshot=5, 
-                         val_set=[X_test, y_test], 
-                         k=args.k, 
-                         optimizer='adam', 
-                         learning_rate=args.learning_rate, 
-                         mu=args.mu, 
-                         margin=args.margin)
+#    model.fit_sequential(X_train, y_train, 
+#                         maxEpoch=args.n_epochs, 
+#                         batch_size=args.batch_size, 
+#                         verbose=2, 
+#                         snapshot=5, 
+#                         val_set=[X_test, y_test], 
+#                         k=args.k, 
+#                         optimizer='adam', 
+#                         learning_rate=args.learning_rate, 
+#                         mu=args.mu, 
+#                         margin=args.margin)
