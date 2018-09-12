@@ -181,19 +181,6 @@ def get_cifar100():
     X_test = _np.transpose(_np.reshape(X_test, (10000, 3, 32, 32)), axes=[0,2,3,1]) 
     
     return X_train, y_train, X_test, y_test
-    
-#%%
-def get_dataset(name='mnist'):
-    datasets = {'mnist': get_mnist,
-                'mnist_distorted': get_mnist_distorted,
-                'mnist_fashion': get_mnist_fashion,
-                'devanagari': get_devanagari,
-                'olivetti': get_olivetti,
-                'cifar10': get_cifar10,
-                'cifar100': get_cifar100}
-    assert (name in datasets), 'Unknown dataset, choose between: ' \
-            + ', '.join([k for k in datasets.keys()])
-    return datasets[name]()
 
 #%%
 def get_birds():
@@ -205,6 +192,26 @@ def get_birds():
     if not _os.path.isdir(direc+'/data_files/cubs_200'):
         _os.system('wget http://www.vision.caltech.edu/visipedia-data/CUB-200-2011/CUB_200_2011.tgz')
         _os.system('tar -xzf CUB_200_2011.tgz')
+        
+#%%
+def get_cars():
+    from .cars_data import load_split_data
+    [x_train, x_val, x_test], [y_train, y_val, y_test] = load_split_data()
+    return x_train, y_train, x_test, y_test    
+    
+#%%
+def get_dataset(name='mnist'):
+    datasets = {'mnist': get_mnist,
+                'mnist_distorted': get_mnist_distorted,
+                'mnist_fashion': get_mnist_fashion,
+                'devanagari': get_devanagari,
+                'olivetti': get_olivetti,
+                'cifar10': get_cifar10,
+                'cifar100': get_cifar100,
+                'cars': get_cars}
+    assert (name in datasets), 'Unknown dataset, choose between: ' \
+            + ', '.join([k for k in datasets.keys()])
+    return datasets[name]()
 
 #%%
 if __name__ == '__main__':    
