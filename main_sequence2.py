@@ -7,13 +7,11 @@ Created on Thu Sep  6 13:14:23 2018
 """
 
 #%%
-import tensorflow as tf
 from dlmnn import sequental_lmnn
 from dlmnn.helper.argparser import lmnn_argparser
 from dlmnn.helper.layers import InputLayer, Flatten, Conv2D, MaxPool2D, \
-                                Dense, LeakyReLU, layerlist
+                                Dense, LeakyReLU
 from dlmnn.data.get_img_data import get_dataset
-from dlmnn.helper.neighbor_funcs import findTargetNeighbours, compare_tN, similarity_tN
 
 #%%
 if __name__ == '__main__':
@@ -41,15 +39,17 @@ if __name__ == '__main__':
     model.add(Dense, units=128)
     model.add(LeakyReLU, alpha=0.3)
     
+    model.set_model_list([3, 6, ], [10, 11, 12])
+    
     # Fit model
-#    model.fit_sequential(X_train, y_train, 
-#                         maxEpoch=args.n_epochs, 
-#                         batch_size=args.batch_size, 
-#                         verbose=2, 
-#                         snapshot=5, 
-#                         val_set=[X_test, y_test], 
-#                         k=args.k, 
-#                         optimizer='adam', 
-#                         learning_rate=args.learning_rate, 
-#                         mu=args.mu, 
-#                         margin=args.margin)
+    model.fit_sequential(X_train, y_train, 
+                         epochs_pr_model=args.n_epochs, 
+                         batch_size=args.batch_size, 
+                         verbose=2, 
+                         snapshot=5, 
+                         val_set=[X_test, y_test], 
+                         k=args.k, 
+                         optimizer='adam', 
+                         learning_rate=args.lr, 
+                         mu=args.mu, 
+                         margin=args.margin)

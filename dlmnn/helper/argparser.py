@@ -27,8 +27,8 @@ class ArgsStruct:
 def lmnn_argparser( ):
     import argparse 
     parser = argparse.ArgumentParser(description='''Argument parser for the 
-                                     lmnn model class. Contains the most 
-                                     important parameters for the class''') 
+                lmnn model class. Contains the most important parameters for the class''',
+                formatter_class=argparse.ArgumentDefaultsHelpFormatter) 
     parser.add_argument('-k', action="store", dest='k', type=int,
                         default=3, help='''Number of neighbours''')
     parser.add_argument('-e', action="store", dest='n_epochs', type=int,
