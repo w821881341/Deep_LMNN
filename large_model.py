@@ -128,32 +128,32 @@ if __name__ == '__main__':
         # Input layer
         model.add(InputLayer, input_shape=x_train.shape[1:])
         # Conv block 1
-        model.add(Conv2D, baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
         model.add(ELU)
         model.add(BatchNormalization)
-        model.add(Conv2D, baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
         model.add(ELU)
         model.add(BatchNormalization)
         model.add(MaxPooling2D, pool_size=(2,2))
-        model.add(Dropout, 0.2)
+        model.add(Dropout, rate=0.2)
         # Conv block 2
-        model.add(Conv2D, 2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=2*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
         model.add(ELU)
         model.add(BatchNormalization)
-        model.add(Conv2D, 2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=2*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
         model.add(ELU)
         model.add(BatchNormalization)
         model.add(MaxPooling2D, pool_size=(2,2))
-        model.add(Dropout, 0.3)
+        model.add(Dropout, rate=0.3)
         # Conv_block 3
-        model.add(Conv2D, 4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=4*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
         model.add(ELU)
         model.add(BatchNormalization)
-        model.add(Conv2D, 4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=4*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
         model.add(ELU)
         model.add(BatchNormalization)
         model.add(MaxPooling2D, pool_size=(2,2))
-        model.add(Dropout, 0.4)
+        model.add(Dropout, rate=0.4)
         # Flatten
         model.add(Flatten)
         
@@ -171,4 +171,4 @@ if __name__ == '__main__':
                              mu=args.mu, 
                              margin=args.margin)
     else:
-        raise ValueError(args.model_type + 'is an uknown option for this script')
+        raise ValueError(args.model_type + ' is an uknown option for this script')
