@@ -41,6 +41,8 @@ def lmnn_argparser( ):
                         default=1e-4, help='''learning rate''')
     parser.add_argument('-w', action="store", dest='mu', type=float,
                         default=0.5, help='''mu''')
+    parser.add_argument('-s', action="store", dest='snapshot', type=int,
+                        default=10, help='''snapshot epoch''')
     parser.add_argument('-r', action="store", dest='log_folder', type=str,
                         default='res', help='''where to store final results''')
     args = parser.parse_args() 

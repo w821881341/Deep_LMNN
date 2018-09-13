@@ -48,8 +48,8 @@ if __name__ == '__main__':
     all_l = [l1, l2, l3, l3]
     
     # Do sequence of model fittings
-    tN = [findTargetNeighbours(X_train, y_train, args.k)]
-    tN_val = [findTargetNeighbours(X_test, y_test, args.k)]
+    tN = [findTargetNeighbours(X_train, y_train, args.k, name='training')]
+    tN_val = [findTargetNeighbours(X_test, y_test, args.k, name='validation')]
     for layer_list in all_l:        
         # Add layers to model
         model = lmnn()
