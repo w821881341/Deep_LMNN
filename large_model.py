@@ -38,7 +38,7 @@ if __name__ == '__main__':
     x_train = (x_train-mean)/(std+1e-7)
     x_test = (x_test-mean)/(std+1e-7)
 
-    if False:
+    if args.model_type == 'softmax':
         y_train = utils.to_categorical(y_train,num_classes)
         y_test = utils.to_categorical(y_test,num_classes)
         
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                   validation_data = [x_test, y_test],
                   batch_size=200)
         
-    if True:
+    elif args.model_type == 'lmnn':
         model = lmnn()
         
         model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay), input_shape=x_train.shape[1:]))
@@ -123,7 +123,7 @@ if __name__ == '__main__':
                   batch_size=args.batch_size,
                   val_set=[x_test, y_test])
         
-    if False:
+    elif args.model_type == 'sequential_lmnn':
         model = sequental_lmnn()
         # Input layer
         model.add(InputLayer, input_shape=x_train.shape[1:])
@@ -160,6 +160,7 @@ if __name__ == '__main__':
         # Set model list
         model.set_model_list([8, 16], [25,])
         
+        # Fit models in sequential order
         model.fit_sequential(x_train, y_train, 
                              epochs_pr_model=args.n_epochs, 
                              batch_size=args.batch_size, 
@@ -169,3 +170,5 @@ if __name__ == '__main__':
                              learning_rate = args.lr, 
                              mu=args.mu, 
                              margin=args.margin)
+    else:
+        raise ValueError(args.model_type + 'is an uknown option for this script')

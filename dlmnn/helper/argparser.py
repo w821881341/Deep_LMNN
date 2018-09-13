@@ -45,6 +45,9 @@ def lmnn_argparser( ):
                         default=10, help='''snapshot epoch''')
     parser.add_argument('-r', action="store", dest='log_folder', type=str,
                         default='res', help='''where to store final results''')
+    parser.add_argument('-model', action="store", dest='model_type', type=str,
+                        default='softmax', help='''which model to train in scripts
+                        where there are multiple to choose between''')
     args = parser.parse_args() 
     args = vars(args) 
     args = ArgsStruct(**args)
