@@ -25,7 +25,7 @@ class lmnn(object):
     def __init__(self, session=None, dir_loc=None):
         # Initilize session and tensorboard dirs
         config = tf.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = 0.95
+        config.gpu_options.allow_growth = True
         self.session = tf.Session(config=config) if session is None else session
         self.dir_loc = './logs' if dir_loc is None else dir_loc
         self._writer = None
@@ -383,7 +383,6 @@ class lmnn(object):
     #%%
     def summary(self):
         """ Gets a summary of the feature extraction model """
-        self._assert_if_build()
         print('Model: lmnn')
         print('='*65)
         print('Input shape:               ', self.extractor.input_shape)

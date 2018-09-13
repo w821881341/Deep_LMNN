@@ -42,14 +42,14 @@ if __name__ == '__main__':
     model.set_model_list([3, 6, ], [10, 11, 12])
     
     # Fit model
-    model.fit_sequential(X_train, y_train, 
-                         epochs_pr_model=args.n_epochs, 
-                         batch_size=args.batch_size, 
-                         verbose=2, 
-                         snapshot=5, 
-                         val_set=[X_test, y_test], 
-                         k=args.k, 
-                         optimizer='adam', 
-                         learning_rate=args.lr, 
-                         mu=args.mu, 
-                         margin=args.margin)
+    stats = model.fit_sequential(X_train, y_train, 
+                                 epochs_pr_model=args.n_epochs, 
+                                 batch_size=args.batch_size, 
+                                 verbose=2, 
+                                 snapshot=args.snapshot, 
+                                 val_set=[X_test, y_test], 
+                                 k=args.k, 
+                                 optimizer='adam', 
+                                 learning_rate=args.lr, 
+                                 mu=args.mu, 
+                                 margin=args.margin)

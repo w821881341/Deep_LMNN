@@ -66,7 +66,7 @@ if __name__ == '__main__':
                   batch_size=args.batch_size, 
                   val_set=[X_test, y_test], 
                   tN=tN[-1], tN_val=tN_val[-1],
-                  snapshot=5)
+                  snapshot=args.snapshot)
             
         # Transform into new feature space
         X_train_trans = model.transform(X_train)

@@ -20,6 +20,7 @@ class sequental_lmnn(lmnn):
         for easier with a sequence of lmnn models'''
     def __init__(self, session=None, dir_loc=None):
         super().__init__(session, dir_loc)
+        self._dir_loc = dir_loc
         self._layerlist = layerlist()
         self.model_list = [ ]
         self.model_list_set = False
@@ -35,8 +36,8 @@ class sequental_lmnn(lmnn):
     
     #%%
     def determine_models(self):
-        ''' Function for determing the set of models that we should train. The
-            paradigm is the following:
+        ''' Function for automatically determing the set of models that we 
+            should train. The paradigm is the following:
                 * First layer is always added
                 * The three last layers are always added
                     - Flatten() layer
@@ -93,6 +94,13 @@ class sequental_lmnn(lmnn):
     
     #%%
     def set_model_list(self, break_layers, end_layers):
+        ''' Lets the user determine the sequential order of models that are
+            fitted with this model.
+           Arguments:
+               break_layers: list, element i is the index to break model i at
+               end_layers: list, index of layers that will exist in all models
+                   (often a flatten/dense layer)
+        '''
         # Number of layers
         n_layers = self._layerlist.n_layers
         assert n_layers > 0, 'Add layers to the model before trying to fit'
@@ -112,7 +120,10 @@ class sequental_lmnn(lmnn):
     def fit_sequential(self, Xtrain, ytrain, epochs_pr_model=50, batch_size=50, 
                        run_id=None, verbose=2, snapshot=10, val_set=None, k=1, 
                        optimizer='adam', learning_rate = 1e-4, mu=0.5, margin=1):
-        ''' Main method of this class. Fits a sequence of lmnn models'''
+        ''' Main method of this class. Fits a sequence of lmnn models, by basically
+            calling the main fit method of the LMNN class over and over again, for
+            each of the determined models, after each model determining the target
+            neighbours again '''
         # Check for validation set
         validation = False
         if val_set:
@@ -133,8 +144,8 @@ class sequental_lmnn(lmnn):
         all_stats = [ ]
         for i in range(n_models):
             # Construct the extractor
-            self.extractor = Sequential()
-            for l in self.model_list[i]: self.extractor(self._layerlist.get_layer[l])
+            super().__init__(session=None, dir_loc=self._dir_loc) # reset model 
+            for l in self.model_list[i]: self.extractor.add(self._layerlist.get_layer(l))
             
             # Compile model
             self.compile(k=k, optimizer=optimizer, learning_rate=learning_rate,
