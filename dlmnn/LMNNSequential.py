@@ -170,8 +170,8 @@ class sequental_lmnn(lmnn):
                 tN_val.append(findTargetNeighbours(Xval_trans, yval, k))
             
             # Save embeddings
-            if validation:
-                self.save_embeddings(Xval, labels=yval)
+            #if validation:
+            #    self.save_embeddings(Xval, labels=yval)
             
             # reset graph
             tf.reset_default_graph()

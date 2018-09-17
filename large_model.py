@@ -22,9 +22,10 @@ import numpy as np
 if __name__ == '__main__':    
     # Input arguments
     args = lmnn_argparser()
+    print(args)
     
     # Get some data
-    x_train, y_train, x_test, y_test = get_dataset('cifar10')
+    x_train, y_train, x_test, y_test = get_dataset(args.dataset)
     input_shape=x_train.shape[1:]
     
     # Constants

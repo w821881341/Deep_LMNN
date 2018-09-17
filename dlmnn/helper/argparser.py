@@ -48,6 +48,8 @@ def lmnn_argparser( ):
     parser.add_argument('-model', action="store", dest='model_type', type=str,
                         default='softmax', help='''which model to train in scripts
                         where there are multiple to choose between''')
+    parser.add_argument('-dataset', action="store", dest='dataset', type=str,
+                        default='cifar10', help='''which dataset to use''')
     args = parser.parse_args() 
     args = vars(args) 
     args = ArgsStruct(**args)

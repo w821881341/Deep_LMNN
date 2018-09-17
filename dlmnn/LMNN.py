@@ -61,7 +61,6 @@ class lmnn(object):
         assert learning_rate > 0, ''' learning rate needs to be a positive number '''
         assert 0 <= mu and mu <= 1, ''' mu needs to be between 0 and 1 '''
         assert margin > 0, ''' margin needs to be a positive number '''
-        
         assert len(self.extractor.layers)!=0, '''Layers must be added with the 
                 lmnn.add() method before this function is called '''
         
