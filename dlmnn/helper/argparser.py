@@ -16,7 +16,7 @@ class ArgsStruct:
         return "Argument structure"
     
     def __str__(self):
-        s = 70*'-' + '\n'
+        s = '\n' + 70*'-' + '\n'
         s += 'Running script with input arguments \n'
         for item, val in self._entries.items():
             s += str(item).ljust(15) + ': ' + str(val) + '\n'

@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # Constants
     baseMapNum = 32
     weight_decay = 1e-4
-    num_classes = 10
+    num_classes = len(np.unique(y_train))
     
     # Normalize data
     mean = np.mean(x_train,axis=(0,1,2,3))
@@ -87,28 +87,28 @@ if __name__ == '__main__':
     elif args.model_type == 'lmnn':
         model = lmnn()
         
-        model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay), input_shape=x_train.shape[1:]))
+        model.add(Conv2D(baseMapNum, (3,3), padding='same'))
         model.add(ELU())
         model.add(BatchNormalization())
-        model.add(Conv2D(baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Conv2D(baseMapNum, (3,3), padding='same'))
         model.add(ELU())
         model.add(BatchNormalization())
         model.add(MaxPooling2D(pool_size=(2,2)))
         model.add(Dropout(0.2))
     
-        model.add(Conv2D(2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Conv2D(2*baseMapNum, (3,3), padding='same'))
         model.add(ELU())
         model.add(BatchNormalization())
-        model.add(Conv2D(2*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Conv2D(2*baseMapNum, (3,3), padding='same'))
         model.add(ELU())
         model.add(BatchNormalization())
         model.add(MaxPooling2D(pool_size=(2,2)))
         model.add(Dropout(0.3))
     
-        model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Conv2D(4*baseMapNum, (3,3), padding='same'))
         model.add(ELU())
         model.add(BatchNormalization())
-        model.add(Conv2D(4*baseMapNum, (3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Conv2D(4*baseMapNum, (3,3), padding='same'))
         model.add(ELU())
         model.add(BatchNormalization())
         model.add(MaxPooling2D(pool_size=(2,2)))
@@ -129,28 +129,28 @@ if __name__ == '__main__':
         # Input layer
         model.add(InputLayer, input_shape=x_train.shape[1:])
         # Conv block 1
-        model.add(Conv2D, filters=baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=baseMapNum, kernel_size=(3,3), padding='same')
         model.add(ELU)
         model.add(BatchNormalization)
-        model.add(Conv2D, filters=baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=baseMapNum, kernel_size=(3,3), padding='same')
         model.add(ELU)
         model.add(BatchNormalization)
         model.add(MaxPooling2D, pool_size=(2,2))
         model.add(Dropout, rate=0.2)
         # Conv block 2
-        model.add(Conv2D, filters=2*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=2*baseMapNum, kernel_size=(3,3), padding='same')
         model.add(ELU)
         model.add(BatchNormalization)
-        model.add(Conv2D, filters=2*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=2*baseMapNum, kernel_size=(3,3), padding='same')
         model.add(ELU)
         model.add(BatchNormalization)
         model.add(MaxPooling2D, pool_size=(2,2))
         model.add(Dropout, rate=0.3)
         # Conv_block 3
-        model.add(Conv2D, filters=4*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=4*baseMapNum, kernel_size=(3,3), padding='same')
         model.add(ELU)
         model.add(BatchNormalization)
-        model.add(Conv2D, filters=4*baseMapNum, kernel_size=(3,3), padding='same', kernel_regularizer=regularizers.l2(weight_decay))
+        model.add(Conv2D, filters=4*baseMapNum, kernel_size=(3,3), padding='same')
         model.add(ELU)
         model.add(BatchNormalization)
         model.add(MaxPooling2D, pool_size=(2,2))

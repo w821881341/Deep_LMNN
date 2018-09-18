@@ -32,19 +32,32 @@ def tf_makePairwiseFunc(trans_func):
             pairwise distance matrix between each set of observations
     """
     
-    def dist_func(X1, X2):
-        with tf.name_scope('pairwise_' + trans_func.__name__):
-            X1, X2 = tf.cast(X1, tf.float32), tf.cast(X2, tf.float32)
-            N, M = tf.shape(X1)[0], tf.shape(X2)[0]
-            X1_trans = trans_func(X1) # N x ???
-            X2_trans = trans_func(X2) # M x ???
-            X1_resh = tf.reshape(X1_trans, (N, -1)) # N x ?
-            X2_resh = tf.reshape(X2_trans, (M, -1)) # M x ?
-            term1 = tf.expand_dims(tf.pow(tf.norm(X1_resh, axis=1), 2.0), 1) # N x 1
-            term2 = tf.expand_dims(tf.pow(tf.norm(X2_resh, axis=1), 2.0), 0) # 1 x M
-            term3 = 2.0*tf.matmul(X1_resh, tf.transpose(X2_resh)) # N x M
-            summ = term1 + term2 - term3 # N x M
-            return tf.maximum(tf.cast(0.0, tf.float32), summ) # N x M
+#    def dist_func(X1, X2):
+#        with tf.name_scope('pairwise_' + trans_func.__name__):
+#            X1, X2 = tf.cast(X1, tf.float32), tf.cast(X2, tf.float32)
+#            N, M = tf.shape(X1)[0], tf.shape(X2)[0]
+#            X1_trans = trans_func(X1) # N x ???
+#            X2_trans = trans_func(X2) # M x ???
+#            X1_resh = tf.reshape(X1_trans, (N, -1)) # N x ?
+#            X2_resh = tf.reshape(X2_trans, (M, -1)) # M x ?
+#            term1 = tf.expand_dims(tf.pow(tf.norm(X1_resh, axis=1), 2.0), 1) # N x 1
+#            term2 = tf.expand_dims(tf.pow(tf.norm(X2_resh, axis=1), 2.0), 0) # 1 x M
+#            term3 = 2.0*tf.matmul(X1_resh, tf.transpose(X2_resh)) # N x M
+#            summ = term1 + term2 - term3 # N x M
+#            return tf.maximum(tf.cast(0.0, tf.float32), summ) # N x M
+    def dist_func(X):
+        with tf.name_scope('pairwise' + trans_func.__name__):
+            X = tf.cast(X, tf.float32)
+            N = tf.shape(X)[0]
+            X_trans = trans_func(X)
+            X_resh = tf.reshape(X_trans, (N, -1))
+            norm = tf.pow(tf.norm(X_resh, axis=1), 2.0)
+            term1 = tf.expand_dims(norm, 1)
+            term2 = tf.expand_dims(norm, 0)
+            term3 = 2.0*tf.matmul(X_resh, tf.transpose(X_resh))
+            summ = term1 + term2 - term3
+            return tf.maximum(tf.cast(0.0, tf.float32), summ)
+        
     return dist_func
 
 #%%

@@ -84,7 +84,8 @@ class lmnn(object):
         self.dist_func = tf_makePairwiseFunc(self.extractor_func)
         
         # Build graph
-        D = self.dist_func(self.Xp, self.Xp)
+        #D = self.dist_func(self.Xp, self.Xp)
+        D = self.dist_func(self.Xp)
         tup = tf_findImposters(D, self.yp, self.tNp, margin=margin)
         self._LMNN_loss, D_1, D_2, D_3 = tf_LMNN_loss(D, self.tNp, tup, mu, margin=margin)
         
