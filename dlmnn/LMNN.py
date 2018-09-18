@@ -117,8 +117,10 @@ class lmnn(object):
         # Create callable functions
         self._transformer = self.session.make_callable(
                 self.extractor_func(self.Xp), [self.Xp])
+#        self._distances = self.session.make_callable(
+#                self.dist_func(self.Xp, self.Xp), [self.Xp])
         self._distances = self.session.make_callable(
-                self.dist_func(self.Xp, self.Xp), [self.Xp])
+                self.dist_func(self.Xp), [self.Xp])
         
     #%%
     def reintialize(self):

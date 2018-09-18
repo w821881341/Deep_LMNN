@@ -86,6 +86,7 @@ if __name__ == '__main__':
         
     elif args.model_type == 'lmnn':
         model = lmnn()
+        model.add(InputLayer(input_shape=x_train.shape[1:]))
         
         model.add(Conv2D(baseMapNum, (3,3), padding='same'))
         model.add(ELU())
