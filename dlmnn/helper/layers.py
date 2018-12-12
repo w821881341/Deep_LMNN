@@ -13,7 +13,7 @@ from tensorflow.python.keras.layers import InputLayer
 from tensorflow.python.keras.layers import Flatten
 from tensorflow.python.keras.layers import LeakyReLU
 
-from tensorflow.python.keras._impl.keras.layers.core import Layer as _Layer
+from tensorflow.python.keras.layers.core import Layer as _Layer
 from tensorflow.python.keras import backend as _K
 
 #%%
